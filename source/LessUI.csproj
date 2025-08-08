@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{1BD10084-D9A8-488E-B66D-642E42470ACE}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>LessUI</RootNamespace>
+    <AssemblyName>LessUI</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\1.6\Assemblies\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Align.cs" />
+    <Compile Include="Canvas.cs" />
+    <Compile Include="components\Button.cs" />
+    <Compile Include="components\ButtonImage.cs" />
+    <Compile Include="components\Checkbox.cs" />
+    <Compile Include="components\Dropdown.cs" />
+    <Compile Include="components\Empty.cs" />
+    <Compile Include="components\FloatRangeSlider.cs" />
+    <Compile Include="components\IntRangeSlider.cs" />
+    <Compile Include="components\LabeledCheckbox.cs" />
+    <Compile Include="components\LabeledRadioButton.cs" />
+    <Compile Include="components\LabeledSlider.cs" />
+    <Compile Include="components\LabeledTextEntry.cs" />
+    <Compile Include="components\Line.cs" />
+    <Compile Include="components\RadioButton.cs" />
+    <Compile Include="components\Slider.cs" />
+    <Compile Include="components\TextEntry.cs" />
+    <Compile Include="components\TextFieldNumeric.cs" />
+    <Compile Include="components\LabeledTextFieldNumeric.cs" />
+    <Compile Include="layout\FillGrid.cs" />
+    <Compile Include="layout\Grid.cs" />
+    <Compile Include="components\Label.cs" />
+    <Compile Include="layout\Row.cs" />
+    <Compile Include="layout\ScrollContainer.cs" />
+    <Compile Include="LineType.cs" />
+    <Compile Include="ScrollCanvas.cs" />
+    <Compile Include="SizeMode.cs" />
+    <Compile Include="layout\Stack.cs" />
+    <Compile Include="UIElement.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UIElementOptions.cs" />
+    <Compile Include="util\TextLineHeightProvider.cs" />
+    <Compile Include="util\TextWidthProvider.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="docs\Canvas.md" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
