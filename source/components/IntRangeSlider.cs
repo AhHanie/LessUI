@@ -1,211 +1,140 @@
-﻿using System;
-using System.Runtime.CompilerServices;
-using UnityEngine;
+﻿using UnityEngine;
 using Verse;
 
 namespace LessUI
 {
-    /// <summary>
-    /// A wrapper around RimWorld's IntRange widget that provides a user-friendly API
-    /// for creating integer range sliders in the UI.
-    /// </summary>
     public class IntRangeSlider : UIElement
     {
-        private int _min;
-        private int _max;
-        private string _tooltip;
+        private int _min = 0;
+        private int _max = 100;
+        private IntRange _range = new IntRange(0, 100);
+        private string _tooltip = "";
         private int _controlId;
 
-        /// <summary>
-        /// Gets or sets the minimum value of the range slider.
-        /// </summary>
         public int Min
         {
             get => _min;
             set => _min = value;
         }
 
-        /// <summary>
-        /// Gets or sets the maximum value of the range slider.
-        /// </summary>
         public int Max
         {
             get => _max;
             set => _max = value;
         }
 
-        /// <summary>
-        /// Gets or sets the lower bound value of the range.
-        /// </summary>
         public int LowerValue
         {
-            get => RangeBox.Value.min;
+            get => _range.min;
             set
             {
                 int newValue = ClampToRange(value, _min, _max);
-                if (newValue > RangeBox.Value.max)
+                if (newValue > _range.max)
                 {
-                    newValue = RangeBox.Value.max;
+                    newValue = _range.max;
                 }
 
-                if (RangeBox.Value.min != newValue)
+                if (_range.min != newValue)
                 {
-                    var currentRange = RangeBox.Value;
-                    currentRange.min = newValue;
-                    RangeBox.Value = currentRange;
+                    _range.min = newValue;
                 }
             }
         }
 
-        /// <summary>
-        /// Gets or sets the upper bound value of the range.
-        /// </summary>
         public int UpperValue
         {
-            get => RangeBox.Value.max;
+            get => _range.max;
             set
             {
                 int newValue = ClampToRange(value, _min, _max);
-                if (newValue < RangeBox.Value.min)
+                if (newValue < _range.min)
                 {
-                    newValue = RangeBox.Value.min;
+                    newValue = _range.min;
                 }
 
-                if (RangeBox.Value.max != newValue)
+                if (_range.max != newValue)
                 {
-                    var currentRange = RangeBox.Value;
-                    currentRange.max = newValue;
-                    RangeBox.Value = currentRange;
+                    _range.max = newValue;
                 }
             }
         }
 
-        /// <summary>
-        /// Gets the StrongBox containing the IntRange value, allowing for shared references.
-        /// </summary>
-        public StrongBox<IntRange> RangeBox { get; }
+        public IntRange Range
+        {
+            get => _range;
+            set => _range = value;
+        }
 
-        /// <summary>
-        /// Gets the span of the current range (upper value - lower value).
-        /// </summary>
-        public int Range => RangeBox.Value.max - RangeBox.Value.min;
+        public int RangeSpan => _range.max - _range.min;
 
-        /// <summary>
-        /// Gets whether the current range is valid (lower value <= upper value).
-        /// </summary>
-        public bool IsValidRange => RangeBox.Value.min <= RangeBox.Value.max;
+        public bool IsValidRange => _range.min <= _range.max;
 
-        /// <summary>
-        /// Gets the total possible range span (max - min).
-        /// </summary>
-        public int MinRange => _max - _min;
+        public int TotalRange => _max - _min;
 
-        /// <summary>
-        /// Gets or sets the tooltip text for the range slider.
-        /// </summary>
         public string Tooltip
         {
             get => _tooltip;
             set => _tooltip = value;
         }
 
-        /// <summary>
-        /// Initializes a new instance of the IntRangeSlider with content-based sizing.
-        /// </summary>
-        /// <param name="min">The minimum value of the range</param>
-        /// <param name="max">The maximum value of the range</param>
-        /// <param name="range">A StrongBox containing the IntRange for shared reference</param>
-        /// <exception cref="ArgumentNullException">Thrown when range is null</exception>
-        public IntRangeSlider(int min, int max, StrongBox<IntRange> range)
-            : base(SizeMode.Content, SizeMode.Content)
+        public IntRangeSlider(
+            int? min = null,
+            int? max = null,
+            IntRange? range = null,
+            string tooltip = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            _min = min;
-            _max = max;
-
-            RangeBox = range ?? throw new ArgumentNullException(nameof(range));
+            _min = min ?? 0;
+            _max = max ?? 100;
+            _range = range ?? new IntRange(0, 100);
+            _tooltip = tooltip ?? "";
             _controlId = GetHashCode();
         }
 
-        /// <summary>
-        /// Initializes a new instance of the IntRangeSlider with fixed sizing.
-        /// </summary>
-        /// <param name="min">The minimum value of the range</param>
-        /// <param name="max">The maximum value of the range</param>
-        /// <param name="width">The fixed width of the slider</param>
-        /// <param name="height">The fixed height of the slider</param>
-        /// <param name="range">A StrongBox containing the IntRange for shared reference</param>
-        /// <exception cref="ArgumentNullException">Thrown when range is null</exception>
-        public IntRangeSlider(int min, int max, float width, float height, StrongBox<IntRange> range)
-            : base(width, height)
+        protected override void CalculateElementSize()
         {
-            _min = min;
-            _max = max;
+            base.CalculateElementSize();
 
-            RangeBox = range ?? throw new ArgumentNullException(nameof(range));
-            _controlId = GetHashCode();
+            if (WidthMode == SizeMode.Content)
+            {
+                WidthCalculated = true;
+                Width = 200f;
+            }
+
+            if (HeightMode == SizeMode.Content)
+            {
+                HeightCalculated = true;
+                Height = 31f;
+            }
         }
 
-        /// <summary>
-        /// Initializes a new instance of the IntRangeSlider with specified width mode.
-        /// </summary>
-        /// <param name="min">The minimum value of the range</param>
-        /// <param name="max">The maximum value of the range</param>
-        /// <param name="widthMode">The width sizing mode</param>
-        /// <param name="range">A StrongBox containing the IntRange for shared reference</param>
-        /// <param name="options">Additional UI element options</param>
-        /// <exception cref="ArgumentNullException">Thrown when range is null</exception>
-        public IntRangeSlider(int min, int max, SizeMode widthMode, StrongBox<IntRange> range, UIElementOptions options = null)
-            : base(widthMode, SizeMode.Content, options)
-        {
-            _min = min;
-            _max = max;
-
-            RangeBox = range ?? throw new ArgumentNullException(nameof(range));
-            _controlId = GetHashCode();
-        }
-
-        /// <summary>
-        /// Calculates the dynamic size of the range slider based on its content.
-        /// </summary>
-        /// <returns>A tuple containing the calculated width and height</returns>
-        public override void CalculateDynamicSize()
-        {
-            // RimWorld's IntRange widget default size - reasonable width and standard height
-            Width = 200f;
-            Height = 200f;
-        }
-
-        /// <summary>
-        /// Renders the integer range slider using RimWorld's native IntRange widget.
-        /// </summary>
         protected override void RenderElement()
         {
             var rect = CreateRect();
 
-            // Use RimWorld's native IntRange widget
-            Widgets.IntRange(rect, _controlId, ref RangeBox.Value, _min, _max);
+            Widgets.IntRange(rect, _controlId, ref _range, _min, _max);
 
-            // Handle tooltip if present
             if (!string.IsNullOrEmpty(_tooltip))
             {
                 TooltipHandler.TipRegion(rect, _tooltip);
             }
         }
 
-        /// <summary>
-        /// Creates a Unity Rect from the range slider's position and size.
-        /// </summary>
-        /// <returns>A Rect representing the range slider's bounds</returns>
         public Rect CreateRect()
         {
             return new Rect(X, Y, Width, Height);
         }
 
-        /// <summary>
-        /// Sets both lower and upper values simultaneously.
-        /// </summary>
-        /// <param name="lowerValue">The new lower bound value</param>
-        /// <param name="upperValue">The new upper bound value</param>
         public void SetValues(int lowerValue, int upperValue)
         {
             int clampedLower = ClampToRange(lowerValue, _min, _max);
@@ -216,16 +145,20 @@ namespace LessUI
                 clampedLower = clampedUpper;
             }
 
-            RangeBox.Value = new IntRange(clampedLower, clampedUpper);
+            _range = new IntRange(clampedLower, clampedUpper);
         }
 
-        /// <summary>
-        /// Clamps a value to the specified range.
-        /// </summary>
-        /// <param name="value">The value to clamp</param>
-        /// <param name="min">The minimum allowed value</param>
-        /// <param name="max">The maximum allowed value</param>
-        /// <returns>The clamped value</returns>
+        public void SetToFullRange()
+        {
+            SetValues(_min, _max);
+        }
+
+        public void SetToSingleValue(int value)
+        {
+            int clampedValue = ClampToRange(value, _min, _max);
+            _range = new IntRange(clampedValue, clampedValue);
+        }
+
         private int ClampToRange(int value, int min, int max)
         {
             if (value < min) return min;

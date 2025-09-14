@@ -4,149 +4,132 @@ using Verse;
 
 namespace LessUI
 {
-    /// <summary>
-    /// A wrapper around RimWorld's radio button functionality that provides a user-friendly API
-    /// for creating interactive radio button controls in the UI.
-    /// </summary>
     public class RadioButton : UIElement
     {
-        private bool _selected;
-        private bool _disabled;
-        private string _tooltip;
+        private bool _selected = false;
+        private bool _disabled = false;
+        private string _tooltip = "";
+        private string _label = "";
+        private bool _clicked = false;
 
-        /// <summary>
-        /// Gets or sets whether the radio button is currently selected.
-        /// </summary>
         public bool Selected
         {
             get => _selected;
             set => _selected = value;
         }
 
-        /// <summary>
-        /// Gets or sets whether the radio button is disabled and cannot be interacted with.
-        /// </summary>
         public bool Disabled
         {
             get => _disabled;
             set => _disabled = value;
         }
 
-        /// <summary>
-        /// Gets or sets the tooltip text to display when hovering over the radio button.
-        /// </summary>
         public string Tooltip
         {
             get => _tooltip;
             set => _tooltip = value;
         }
 
-        /// <summary>
-        /// Event callback that is invoked when the radio button is clicked.
-        /// </summary>
-        public Action OnClick { get; set; }
-
-        /// <summary>
-        /// Creates a new radio button with content-based sizing.
-        /// </summary>
-        /// <param name="selected">Whether the radio button is initially selected</param>
-        /// <param name="onClick">Callback function to execute when clicked</param>
-        /// <param name="options">Optional UI element options</param>
-        public RadioButton(bool selected, Action onClick, UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
+        public string Label
         {
-            _selected = selected;
-            _disabled = false;
-            OnClick = onClick;
+            get => _label;
+            set => _label = value;
         }
 
-        /// <summary>
-        /// Creates a new radio button with fixed dimensions.
-        /// </summary>
-        /// <param name="width">Fixed width of the radio button</param>
-        /// <param name="height">Fixed height of the radio button</param>
-        /// <param name="selected">Whether the radio button is initially selected</param>
-        /// <param name="onClick">Callback function to execute when clicked</param>
-        /// <param name="options">Optional UI element options</param>
-        public RadioButton(float width, float height, bool selected, Action onClick, UIElementOptions options = null) : base(width, height, options)
+        public bool Clicked
         {
-            _selected = selected;
-            _disabled = false;
-            OnClick = onClick;
+            get => _clicked;
+            set => _clicked = value;
         }
 
-        /// <summary>
-        /// Creates a new radio button as a child of the specified parent.
-        /// </summary>
-        /// <param name="parent">The parent UI element</param>
-        /// <param name="selected">Whether the radio button is initially selected</param>
-        /// <param name="onClick">Callback function to execute when clicked</param>
-        /// <param name="options">Optional UI element options</param>
-        public RadioButton(UIElement parent, bool selected, Action onClick, UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
+        public bool IsEmpty => string.IsNullOrWhiteSpace(_label);
+
+        public RadioButton(
+            string label = null,
+            bool? selected = null,
+            bool? disabled = null,
+            string tooltip = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            _selected = selected;
-            _disabled = false;
-            if (parent != null)
+            _label = label ?? "";
+            _selected = selected ?? false;
+            _disabled = disabled ?? false;
+            _tooltip = tooltip ?? "";
+        }
+
+        protected override void CalculateElementSize()
+        {
+            base.CalculateElementSize();
+
+            if (WidthMode == SizeMode.Content)
             {
-                parent.AddChild(this);
+                WidthCalculated = true;
+                if (IsEmpty)
+                {
+                    Width = 24f;
+                }
+                else
+                {
+                    var originalWordWrap = Verse.Text.WordWrap;
+                    Verse.Text.WordWrap = false;
+                    var textSize = Verse.Text.CalcSize(_label);
+                    Width = 24f + 6f + textSize.x;
+                    Verse.Text.WordWrap = originalWordWrap;
+                }
             }
-            OnClick = onClick;
+
+            if (HeightMode == SizeMode.Content)
+            {
+                HeightCalculated = true;
+                if (IsEmpty)
+                {
+                    Height = GetLineHeight();
+                }
+                else
+                {
+                    Height = Math.Max(24f, GetLineHeight());
+                }
+            }
         }
 
-        /// <summary>
-        /// Calculates the dynamic size of the radio button.
-        /// </summary>
-        /// <returns>A tuple containing the calculated width and height</returns>
-        public override void CalculateDynamicSize()
-        {
-            // Radio button without text is just the radio circle (approximately 24 pixels)
-            Width = 24f;
-            Height = GetLineHeight();
-        }
-
-        /// <summary>
-        /// Renders the radio button using RimWorld's UI system.
-        /// </summary>
         protected override void RenderElement()
         {
-            // Create rect for rendering
             var rect = CreateRect();
 
-            // Store original selected state
-            bool originalSelected = _selected;
+            bool wasClicked = Widgets.RadioButtonLabeled(rect, _label ?? "", _selected, _disabled);
 
-            bool wasClicked;
-
-            // Render the radio button without text label using RadioButtonLabeled with empty string
-            wasClicked = Widgets.RadioButtonLabeled(rect, "", _selected, _disabled);
-
-            // If clicked and not disabled, update selection state and trigger callback
             if (wasClicked && !_disabled)
             {
-                // For radio buttons, clicking should always select them
                 _selected = true;
-                OnClick?.Invoke();
+                _clicked = true;
             }
 
-            // Handle tooltip if present
+            if (!wasClicked && Clicked)
+            {
+                _clicked = false;
+            }
+
             if (!string.IsNullOrEmpty(_tooltip))
             {
                 TooltipHandler.TipRegion(rect, _tooltip);
             }
         }
 
-        /// <summary>
-        /// Creates a Unity Rect from the radio button's position and size.
-        /// </summary>
-        /// <returns>A Rect representing the radio button's bounds</returns>
         public Rect CreateRect()
         {
             return new Rect(X, Y, Width, Height);
         }
 
-        /// <summary>
-        /// Gets the height of a single line of text.
-        /// </summary>
-        /// <returns>The line height</returns>
         private float GetLineHeight()
         {
             return Verse.Text.LineHeight;

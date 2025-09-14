@@ -4,183 +4,91 @@ using Verse;
 
 namespace LessUI
 {
-    /// <summary>
-    /// A wrapper around RimWorld's numeric text field functionality that provides a user-friendly API
-    /// for creating interactive numeric input controls in the UI.
-    /// </summary>
-    /// <typeparam name="T">The numeric type (int, float, double, etc.)</typeparam>
     public class TextFieldNumeric<T> : UIElement where T : struct
     {
-        private T _value;
-        private string _buffer;
+        private T _value = default(T);
+        private string _buffer = "";
         private T _min;
         private T _max;
-        private string _tooltip;
+        private string _tooltip = "";
+        private string _label = "";
+        private bool _changed = false;
 
-        /// <summary>
-        /// Gets or sets the numeric value of the text field.
-        /// </summary>
         public T Value
         {
             get => _value;
             set => _value = value;
         }
 
-        /// <summary>
-        /// Gets or sets the string buffer used internally by RimWorld for text editing.
-        /// </summary>
         public string Buffer
         {
             get => _buffer;
             set => _buffer = value ?? "";
         }
 
-        /// <summary>
-        /// Gets or sets the minimum allowed value.
-        /// </summary>
         public T Min
         {
             get => _min;
             set => _min = value;
         }
 
-        /// <summary>
-        /// Gets or sets the maximum allowed value.
-        /// </summary>
         public T Max
         {
             get => _max;
             set => _max = value;
         }
 
-        /// <summary>
-        /// Gets or sets the tooltip text to display when hovering over the text field.
-        /// </summary>
         public string Tooltip
         {
             get => _tooltip;
             set => _tooltip = value;
         }
 
-        /// <summary>
-        /// Event callback that is invoked when the numeric value changes.
-        /// The parameter contains the new numeric value.
-        /// </summary>
-        public Action<T> OnValueChanged { get; set; }
-
-        /// <summary>
-        /// Creates a new numeric text field with content-based sizing.
-        /// </summary>
-        /// <param name="value">The initial numeric value</param>
-        /// <param name="buffer">The initial string buffer</param>
-        /// <param name="onValueChanged">Callback function to execute when value changes</param>
-        /// <param name="options">Optional UI element options</param>
-        public TextFieldNumeric(T value, string buffer, Action<T> onValueChanged = null, UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
+        public string Label
         {
-            _value = value;
-            _buffer = buffer ?? "";
-            OnValueChanged = onValueChanged;
+            get => _label;
+            set => _label = value;
+        }
+
+        public bool Changed
+        {
+            get => _changed;
+            set => _changed = value;
+        }
+
+        public bool IsEmpty => string.IsNullOrWhiteSpace(_label);
+
+        public TextFieldNumeric(
+            T? value = null,
+            T? min = null,
+            T? max = null,
+            string buffer = null,
+            string label = null,
+            string tooltip = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
+        {
             SetDefaultMinMax();
-        }
 
-        /// <summary>
-        /// Creates a new numeric text field with specified width sizing mode.
-        /// </summary>
-        /// <param name="value">The initial numeric value</param>
-        /// <param name="buffer">The initial string buffer</param>
-        /// <param name="widthMode">The width sizing mode (Content or Fill)</param>
-        /// <param name="onValueChanged">Callback function to execute when value changes</param>
-        /// <param name="options">Optional UI element options</param>
-        public TextFieldNumeric(T value, string buffer, SizeMode widthMode, Action<T> onValueChanged = null, UIElementOptions options = null) : base(widthMode, SizeMode.Content, options)
-        {
-            _value = value;
+            _value = value ?? default(T);
+            _min = min ?? _min;
+            _max = max ?? _max;
             _buffer = buffer ?? "";
-            OnValueChanged = onValueChanged;
-            SetDefaultMinMax();
+            _label = label ?? "";
+            _tooltip = tooltip ?? "";
         }
 
-        /// <summary>
-        /// Creates a new numeric text field with minimum and maximum values.
-        /// </summary>
-        /// <param name="value">The initial numeric value</param>
-        /// <param name="buffer">The initial string buffer</param>
-        /// <param name="min">The minimum allowed value</param>
-        /// <param name="max">The maximum allowed value</param>
-        /// <param name="onValueChanged">Callback function to execute when value changes</param>
-        /// <param name="options">Optional UI element options</param>
-        public TextFieldNumeric(T value, string buffer, T min, T max, Action<T> onValueChanged = null, UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
-        {
-            _value = value;
-            _buffer = buffer ?? "";
-            _min = min;
-            _max = max;
-            OnValueChanged = onValueChanged;
-        }
-
-        /// <summary>
-        /// Creates a new numeric text field with fixed dimensions.
-        /// </summary>
-        /// <param name="value">The initial numeric value</param>
-        /// <param name="buffer">The initial string buffer</param>
-        /// <param name="width">Fixed width of the text field</param>
-        /// <param name="height">Fixed height of the text field</param>
-        /// <param name="onValueChanged">Callback function to execute when value changes</param>
-        /// <param name="options">Optional UI element options</param>
-        public TextFieldNumeric(T value, string buffer, float width, float height, Action<T> onValueChanged = null, UIElementOptions options = null) : base(width, height, options)
-        {
-            _value = value;
-            _buffer = buffer ?? "";
-            OnValueChanged = onValueChanged;
-            SetDefaultMinMax();
-        }
-
-        /// <summary>
-        /// Creates a new numeric text field with content-based sizing as a child of the specified parent.
-        /// </summary>
-        /// <param name="parent">The parent UI element</param>
-        /// <param name="value">The initial numeric value</param>
-        /// <param name="buffer">The initial string buffer</param>
-        /// <param name="onValueChanged">Callback function to execute when value changes</param>
-        /// <param name="options">Optional UI element options</param>
-        public TextFieldNumeric(UIElement parent, T value, string buffer, Action<T> onValueChanged = null, UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
-        {
-            _value = value;
-            _buffer = buffer ?? "";
-            OnValueChanged = onValueChanged;
-            SetDefaultMinMax();
-            if (parent != null)
-            {
-                parent.AddChild(this);
-            }
-        }
-
-        /// <summary>
-        /// Creates a new numeric text field with specified width sizing mode as a child of the specified parent.
-        /// </summary>
-        /// <param name="parent">The parent UI element</param>
-        /// <param name="value">The initial numeric value</param>
-        /// <param name="buffer">The initial string buffer</param>
-        /// <param name="widthMode">The width sizing mode (Content or Fill)</param>
-        /// <param name="onValueChanged">Callback function to execute when value changes</param>
-        /// <param name="options">Optional UI element options</param>
-        public TextFieldNumeric(UIElement parent, T value, string buffer, SizeMode widthMode, Action<T> onValueChanged = null, UIElementOptions options = null) : base(widthMode, SizeMode.Content, options)
-        {
-            _value = value;
-            _buffer = buffer ?? "";
-            OnValueChanged = onValueChanged;
-            SetDefaultMinMax();
-            if (parent != null)
-            {
-                parent.AddChild(this);
-            }
-        }
-
-        /// <summary>
-        /// Sets default min and max values based on the numeric type.
-        /// </summary>
         private void SetDefaultMinMax()
         {
-            // Default to 0 and 1 billion, matching RimWorld's defaults
             if (typeof(T) == typeof(int))
             {
                 _min = (T)(object)0;
@@ -198,85 +106,91 @@ namespace LessUI
             }
             else
             {
-                // For other types, try to set reasonable defaults
                 _min = default(T);
                 _max = (T)(object)1000000000;
             }
         }
 
-        /// <summary>
-        /// Calculates the dynamic size of the numeric text field.
-        /// </summary>
-        /// <returns>A tuple containing the calculated width and height</returns>
-        public override void CalculateDynamicSize()
+        protected override void CalculateElementSize()
         {
-            // Height based on line height
-            float height = GetLineHeight();
+            base.CalculateElementSize();
 
-            // Handle Fill mode
-            if (WidthMode == SizeMode.Fill)
+            if (WidthMode == SizeMode.Content)
             {
-                Height = Math.Max(1f, height);
-                return;
+                WidthCalculated = true;
+                if (IsEmpty)
+                {
+                    Width = 120f;
+                }
+                else
+                {
+                    var originalWordWrap = Verse.Text.WordWrap;
+                    Verse.Text.WordWrap = false;
+                    var textSize = Verse.Text.CalcSize(_label);
+                    Width = Math.Max(120f, textSize.x);
+                    Verse.Text.WordWrap = originalWordWrap;
+                }
             }
 
-            // Default width for numeric text field (Content mode)
-            float width = 120f;
-
-            width = Math.Max(1f, width);
-            Height = Math.Max(1f, height);
+            if (HeightMode == SizeMode.Content)
+            {
+                HeightCalculated = true;
+                if (IsEmpty)
+                {
+                    Height = GetLineHeight();
+                }
+                else
+                {
+                    Height = GetLineHeight() + GetLineHeight();
+                }
+            }
         }
 
-        /// <summary>
-        /// Renders the numeric text field using RimWorld's UI system.
-        /// </summary>
         protected override void RenderElement()
         {
-            // Create rect for rendering
             var rect = CreateRect();
+            var labelHeight = IsEmpty ? 0f : GetLineHeight();
 
-            // Store original value to detect changes
-            T originalValue = _value;
-
-            // Render the numeric text field using RimWorld's TextFieldNumeric
-            Widgets.TextFieldNumeric(rect, ref _value, ref _buffer, ConvertToFloat(_min), ConvertToFloat(_max));
-
-            // If value changed, trigger callback
-            if (!_value.Equals(originalValue))
+            if (!IsEmpty)
             {
-                OnValueChanged?.Invoke(_value);
+                var labelRect = new Rect(rect.x, rect.y, rect.width, labelHeight);
+                var originalAnchor = Verse.Text.Anchor;
+                Verse.Text.Anchor = TextAnchor.UpperLeft;
+                Widgets.Label(labelRect, _label);
+                Verse.Text.Anchor = originalAnchor;
             }
 
-            // Handle tooltip if present
+            var textFieldRect = new Rect(rect.x, rect.y + labelHeight, rect.width, rect.height - labelHeight);
+
+            T originalValue = _value;
+
+            Widgets.TextFieldNumeric(textFieldRect, ref _value, ref _buffer, ConvertToFloat(_min), ConvertToFloat(_max));
+
+            if (!_value.Equals(originalValue))
+            {
+                _changed = true;
+            }
+            else if (_changed)
+            {
+                _changed = false;
+            }
+
             if (!string.IsNullOrEmpty(_tooltip))
             {
                 TooltipHandler.TipRegion(rect, _tooltip);
             }
         }
 
-        /// <summary>
-        /// Creates a Unity Rect from the text field's position and size.
-        /// </summary>
-        /// <returns>A Rect representing the text field's bounds</returns>
         public Rect CreateRect()
         {
             return new Rect(X, Y, Width, Height);
         }
 
-        /// <summary>
-        /// Gets the height of a single line of text.
-        /// </summary>
-        /// <returns>The line height</returns>
         private float GetLineHeight()
         {
             return Verse.Text.LineHeight;
         }
 
-        /// <summary>
-        /// Converts a numeric value to float for RimWorld's TextFieldNumeric method.
-        /// </summary>
-        /// <param name="value">The value to convert</param>
-        /// <returns>The value as a float</returns>
         private float ConvertToFloat(T value)
         {
             return Convert.ToSingle(value);

@@ -1,139 +1,80 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using Verse;
+using UnityEngine;
 
 namespace LessUI
 {
-    /// <summary>
-    /// A container that arranges its children in a vertical stack layout.
-    /// Children are positioned one below the other with configurable spacing.
-    /// This is similar to the default UIElement behavior but made explicit as a layout container.
-    /// </summary>
     public class Stack : UIElement
     {
-        /// <summary>
-        /// Creates a new stack with default content-based sizing and default spacing.
-        /// </summary>
-        /// <param name="options">Optional UI element options</param>
-        public Stack(UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
+        private float _verticalSpacing = 2f;
+        public float VerticalSpacing 
+        { 
+            get => _verticalSpacing;
+            set => _verticalSpacing = value; 
+        }
+        public Stack(
+            float? verticalSpacing = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            // Use default VerticalSpacing (2f) from UIElement
+            _verticalSpacing = verticalSpacing ?? 2f;
         }
 
-        /// <summary>
-        /// Creates a new stack with custom vertical spacing between children.
-        /// </summary>
-        /// <param name="spacing">The vertical spacing between children</param>
-        /// <param name="options">Optional UI element options</param>
-        public Stack(float spacing, UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
+        public Stack(
+            List<UIElement> children,
+            float? verticalSpacing = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(children, x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            VerticalSpacing = spacing;
+            _verticalSpacing = verticalSpacing ?? 2f;
         }
 
-        /// <summary>
-        /// Creates a new stack with specified width sizing mode and content-based height.
-        /// </summary>
-        /// <param name="widthMode">The width sizing mode (Content or Fill)</param>
-        /// <param name="options">Optional UI element options</param>
-        public Stack(SizeMode widthMode, UIElementOptions options = null) : base(widthMode, SizeMode.Content, options)
+        protected override float CalculateContentWidthFromChildren()
         {
-            // Use default VerticalSpacing (2f) from UIElement
-        }
-
-        /// <summary>
-        /// Creates a new stack with specified width sizing mode, content-based height, and custom spacing.
-        /// </summary>
-        /// <param name="widthMode">The width sizing mode (Content or Fill)</param>
-        /// <param name="spacing">The vertical spacing between children</param>
-        /// <param name="options">Optional UI element options</param>
-        public Stack(SizeMode widthMode, float spacing, UIElementOptions options = null) : base(widthMode, SizeMode.Content, options)
-        {
-            VerticalSpacing = spacing;
-        }
-
-        /// <summary>
-        /// Creates a new stack with specified sizing modes for both width and height.
-        /// </summary>
-        /// <param name="widthMode">The width sizing mode (Fixed, Content, or Fill)</param>
-        /// <param name="heightMode">The height sizing mode (Fixed, Content, or Fill)</param>
-        /// <param name="options">Optional UI element options</param>
-        public Stack(SizeMode widthMode, SizeMode heightMode, UIElementOptions options = null) : base(widthMode, heightMode, options)
-        {
-            // Use default VerticalSpacing (2f) from UIElement
-        }
-
-        /// <summary>
-        /// Creates a new stack with specified sizing modes and custom spacing.
-        /// </summary>
-        /// <param name="widthMode">The width sizing mode (Fixed, Content, or Fill)</param>
-        /// <param name="heightMode">The height sizing mode (Fixed, Content, or Fill)</param>
-        /// <param name="spacing">The vertical spacing between children</param>
-        /// <param name="options">Optional UI element options</param>
-        public Stack(SizeMode widthMode, SizeMode heightMode, float spacing, UIElementOptions options = null) : base(widthMode, heightMode, options)
-        {
-            VerticalSpacing = spacing;
-        }
-
-        /// <summary>
-        /// Calculates the dynamic size of the stack based on its children.
-        /// This ensures children are sized before the stack calculates its own content size.
-        /// </summary>
-        public override void CalculateDynamicSize()
-        {
-            base.CalculateDynamicSize();
-            // Ensure all children are sized before we calculate our content dimensions
-            foreach (var child in Children)
-            {
-                child.CalculateDynamicSize();
-            }
-
-            // Let the base class handle Fill/Content/Fixed logic properly
-            base.CalculateDynamicSize();
-        }
-
-        /// <summary>
-        /// Calculates the width needed to contain all children.
-        /// Width is determined by the widest child.
-        /// </summary>
-        /// <returns>The calculated content width</returns>
-        protected override float CalculateContentWidth()
-        {
-            if (!Children.Any())
-            {
-                return 50f; // Default width when no children
-            }
-
-            // Width is the maximum width of all children
             float width = Children.Max(child => child.Width);
             return Math.Max(1f, width);
         }
 
-        /// <summary>
-        /// Calculates the height needed to contain all children.
-        /// Height is the sum of all children heights plus spacing between them.
-        /// </summary>
-        /// <returns>The calculated content height</returns>
-        protected override float CalculateContentHeight()
+        protected override float CalculateContentHeightFromChildren()
         {
-            if (!Children.Any())
-            {
-                return 30f; // Default height when no children
-            }
-
-            // Height is the sum of all children heights plus spacing
             float height = Children.Sum(child => child.Height);
             if (Children.Count > 1)
             {
-                height += VerticalSpacing * (Children.Count - 1);
+                height += _verticalSpacing * (Children.Count - 1);
             }
-
             return Math.Max(1f, height);
         }
 
-        /// <summary>
-        /// Stack uses the default UIElement layout behavior which positions children
-        /// vertically one below the other with VerticalSpacing between them.
-        /// We don't need to override LayoutChildren since UIElement already does what we want.
-        /// </summary>
+        protected override void LayoutChildren()
+        {
+            float currentY = Y;
+
+            foreach (var child in Children)
+            {
+                child.X = X;
+                child.Y = currentY;
+
+                currentY += child.Height + _verticalSpacing;
+            }
+        }
     }
 }

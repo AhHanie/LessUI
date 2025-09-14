@@ -1,86 +1,72 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace LessUI
 {
-    /// <summary>
-    /// A container that arranges its children in a horizontal row layout.
-    /// Children are positioned side by side with configurable spacing.
-    /// </summary>
     public class Row : UIElement
     {
         private float _horizontalSpacing = 2f;
 
-        /// <summary>
-        /// Gets or sets the horizontal spacing between children.
-        /// </summary>
         public float HorizontalSpacing
         {
             get => _horizontalSpacing;
             set => _horizontalSpacing = value;
         }
 
-        /// <summary>
-        /// Creates a new row with default content-based sizing and default spacing.
-        /// </summary>
-        /// <param name="options">Optional UI element options</param>
-        public Row(UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
+        public Row(
+            float? horizontalSpacing = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            // Use default HorizontalSpacing (2f)
+            _horizontalSpacing = horizontalSpacing ?? 2f;
         }
 
-        /// <summary>
-        /// Creates a new row with custom horizontal spacing between children.
-        /// </summary>
-        /// <param name="spacing">The horizontal spacing between children</param>
-        /// <param name="options">Optional UI element options</param>
-        public Row(float spacing, UIElementOptions options = null) : base(SizeMode.Content, SizeMode.Content, options)
+        public Row(
+            List<UIElement> children,
+            float? horizontalSpacing = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(children, x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            _horizontalSpacing = spacing;
+            _horizontalSpacing = horizontalSpacing ?? 2f;
         }
 
-        /// <summary>
-        /// Calculates the dynamic size of the row based on its children.
-        /// Width is the sum of all children widths plus spacing between them.
-        /// Height is determined by the tallest child.
-        /// </summary>
-        /// <returns>A tuple containing the calculated width and height</returns>
-        public override void CalculateDynamicSize()
+        protected override float CalculateContentWidthFromChildren()
         {
-            base.CalculateDynamicSize();
-
-            foreach (var child in Children)
-            {
-                child.CalculateDynamicSize();
-            }
-
-            base.CalculateDynamicSize();
-
-            if (!Children.Any())
-            {
-                // Return default size when no children
-                Width = 50f;
-                Height = 30f;
-                return;
-            }
-
-            // Width is the sum of all children widths plus spacing
             float width = Children.Sum(child => child.Width);
             if (Children.Count > 1)
             {
                 width += _horizontalSpacing * (Children.Count - 1);
             }
 
-            // Height is the maximum height of all children
-            float height = Children.Max(child => child.Height);
-
-            Width = Math.Max(1f, width);
-            Height = Math.Max(1f, height);
+            return Math.Max(1f, width);
         }
 
-        /// <summary>
-        /// Overrides the default layout to position children horizontally side by side.
-        /// </summary>
+        protected override float CalculateContentHeightFromChildren()
+        {
+            float height = Children.Max(child => child.Height);
+            return Math.Max(1f, height);
+        }
+
         protected override void LayoutChildren()
         {
             float currentX = X;

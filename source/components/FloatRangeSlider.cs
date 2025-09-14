@@ -1,20 +1,15 @@
-﻿using System;
-using System.Runtime.CompilerServices;
-using UnityEngine;
+﻿using UnityEngine;
 using Verse;
 
 namespace LessUI
 {
-    /// <summary>
-    /// A wrapper around RimWorld's FloatRange widget that provides a user-friendly API
-    /// for creating float range sliders in the UI.
-    /// </summary>
     public class FloatRangeSlider : UIElement
     {
-        private float _min;
-        private float _max;
-        private string _tooltip;
-        private string _labelKey;
+        private float _min = 0f;
+        private float _max = 100f;
+        private FloatRange _range = new FloatRange(0f, 100f);
+        private string _tooltip = "";
+        private string _labelKey = "";
         private ToStringStyle _valueStyle = ToStringStyle.FloatTwo;
         private float _gap = 0f;
         private GameFont _sliderLabelFont = GameFont.Small;
@@ -22,294 +17,209 @@ namespace LessUI
         private float _roundTo = 0f;
         private int _controlId;
 
-        /// <summary>
-        /// Gets or sets the minimum value of the range slider.
-        /// </summary>
         public float Min
         {
             get => _min;
             set => _min = value;
         }
 
-        /// <summary>
-        /// Gets or sets the maximum value of the range slider.
-        /// </summary>
         public float Max
         {
             get => _max;
             set => _max = value;
         }
 
-        /// <summary>
-        /// Gets or sets the lower bound value of the range.
-        /// </summary>
         public float LowerValue
         {
-            get => RangeBox.Value.min;
+            get => _range.min;
             set
             {
                 float newValue = ClampToRange(value, _min, _max);
-                if (newValue > RangeBox.Value.max - _gap)
+                if (newValue > _range.max - _gap)
                 {
-                    newValue = RangeBox.Value.max - _gap;
+                    newValue = _range.max - _gap;
                 }
 
-                if (!Mathf.Approximately(RangeBox.Value.min, newValue))
+                if (!Mathf.Approximately(_range.min, newValue))
                 {
-                    var currentRange = RangeBox.Value;
-                    currentRange.min = newValue;
-                    RangeBox.Value = currentRange;
+                    _range.min = newValue;
                 }
             }
         }
 
-        /// <summary>
-        /// Gets or sets the upper bound value of the range.
-        /// </summary>
         public float UpperValue
         {
-            get => RangeBox.Value.max;
+            get => _range.max;
             set
             {
                 float newValue = ClampToRange(value, _min, _max);
-                if (newValue < RangeBox.Value.min + _gap)
+                if (newValue < _range.min + _gap)
                 {
-                    newValue = RangeBox.Value.min + _gap;
+                    newValue = _range.min + _gap;
                 }
 
-                if (!Mathf.Approximately(RangeBox.Value.max, newValue))
+                if (!Mathf.Approximately(_range.max, newValue))
                 {
-                    var currentRange = RangeBox.Value;
-                    currentRange.max = newValue;
-                    RangeBox.Value = currentRange;
+                    _range.max = newValue;
                 }
             }
         }
 
-        /// <summary>
-        /// Gets the StrongBox containing the FloatRange value, allowing for shared references.
-        /// </summary>
-        public StrongBox<FloatRange> RangeBox { get; }
+        public FloatRange Range
+        {
+            get => _range;
+            set => _range = value;
+        }
 
-        /// <summary>
-        /// Gets the span of the current range (upper value - lower value).
-        /// </summary>
-        public float Range => RangeBox.Value.max - RangeBox.Value.min;
+        public float RangeSpan => _range.max - _range.min;
 
-        /// <summary>
-        /// Gets whether the current range is valid (lower value <= upper value).
-        /// </summary>
-        public bool IsValidRange => RangeBox.Value.min <= RangeBox.Value.max;
+        public bool IsValidRange => _range.min <= _range.max;
 
-        /// <summary>
-        /// Gets the total possible range span (max - min).
-        /// </summary>
         public float TotalRange => _max - _min;
 
-        /// <summary>
-        /// Gets or sets the tooltip text for the range slider.
-        /// </summary>
         public string Tooltip
         {
             get => _tooltip;
             set => _tooltip = value;
         }
 
-        /// <summary>
-        /// Gets or sets the label key for the range slider display.
-        /// </summary>
         public string LabelKey
         {
             get => _labelKey;
             set => _labelKey = value;
         }
 
-        /// <summary>
-        /// Gets or sets the string formatting style for the range values.
-        /// </summary>
         public ToStringStyle ValueStyle
         {
             get => _valueStyle;
             set => _valueStyle = value;
         }
 
-        /// <summary>
-        /// Gets or sets the minimum gap that must be maintained between min and max values.
-        /// </summary>
         public float Gap
         {
             get => _gap;
             set => _gap = value;
         }
 
-        /// <summary>
-        /// Gets or sets the font used for the slider label.
-        /// </summary>
         public GameFont SliderLabelFont
         {
             get => _sliderLabelFont;
             set => _sliderLabelFont = value;
         }
 
-        /// <summary>
-        /// Gets or sets the color used for the slider label.
-        /// </summary>
         public Color? SliderLabelColor
         {
             get => _sliderLabelColor;
             set => _sliderLabelColor = value;
         }
 
-        /// <summary>
-        /// Gets or sets the rounding precision for slider values. 0 means no rounding.
-        /// </summary>
         public float RoundTo
         {
             get => _roundTo;
             set => _roundTo = value;
         }
 
-        /// <summary>
-        /// Initializes a new instance of the FloatRangeSlider with content-based sizing.
-        /// </summary>
-        /// <param name="min">The minimum value of the range</param>
-        /// <param name="max">The maximum value of the range</param>
-        /// <param name="range">A StrongBox containing the FloatRange for shared reference</param>
-        /// <exception cref="ArgumentNullException">Thrown when range is null</exception>
-        public FloatRangeSlider(float min, float max, StrongBox<FloatRange> range)
-            : base(SizeMode.Content, SizeMode.Content)
+        public FloatRangeSlider(
+            float? min = null,
+            float? max = null,
+            FloatRange? range = null,
+            string labelKey = null,
+            string tooltip = null,
+            ToStringStyle? valueStyle = null,
+            float? gap = null,
+            GameFont? sliderLabelFont = null,
+            Color? sliderLabelColor = null,
+            float? roundTo = null,
+            float? x = null,
+            float? y = null,
+            float? width = null,
+            float? height = null,
+            SizeMode? widthMode = null,
+            SizeMode? heightMode = null,
+            Align? alignment = null,
+            bool? showBorders = null,
+            Color? borderColor = null,
+            int? borderThickness = null)
+            : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            _min = min;
-            _max = max;
-
-            RangeBox = range ?? throw new ArgumentNullException(nameof(range));
+            _min = min ?? 0f;
+            _max = max ?? 100f;
+            _range = range ?? new FloatRange(0f, 100f);
+            _labelKey = labelKey ?? "";
+            _tooltip = tooltip ?? "";
+            _valueStyle = valueStyle ?? ToStringStyle.FloatTwo;
+            _gap = gap ?? 0f;
+            _sliderLabelFont = sliderLabelFont ?? GameFont.Small;
+            _sliderLabelColor = sliderLabelColor;
+            _roundTo = roundTo ?? 0f;
             _controlId = GetHashCode();
         }
 
-        /// <summary>
-        /// Initializes a new instance of the FloatRangeSlider with fixed sizing.
-        /// </summary>
-        /// <param name="min">The minimum value of the range</param>
-        /// <param name="max">The maximum value of the range</param>
-        /// <param name="width">The fixed width of the slider</param>
-        /// <param name="height">The fixed height of the slider</param>
-        /// <param name="range">A StrongBox containing the FloatRange for shared reference</param>
-        /// <exception cref="ArgumentNullException">Thrown when range is null</exception>
-        public FloatRangeSlider(float min, float max, float width, float height, StrongBox<FloatRange> range)
-            : base(width, height)
+        protected override void CalculateElementSize()
         {
-            _min = min;
-            _max = max;
+            base.CalculateElementSize();
 
-            RangeBox = range ?? throw new ArgumentNullException(nameof(range));
-            _controlId = GetHashCode();
+            if (WidthMode == SizeMode.Content)
+            {
+                WidthCalculated = true;
+                Width = 200f;
+            }
+
+            if (HeightMode == SizeMode.Content)
+            {
+                HeightCalculated = true;
+                Height = 31f;
+            }
         }
 
-        /// <summary>
-        /// Initializes a new instance of the FloatRangeSlider with specified width mode.
-        /// </summary>
-        /// <param name="min">The minimum value of the range</param>
-        /// <param name="max">The maximum value of the range</param>
-        /// <param name="widthMode">The width sizing mode</param>
-        /// <param name="range">A StrongBox containing the FloatRange for shared reference</param>
-        /// <param name="options">Additional UI element options</param>
-        /// <exception cref="ArgumentNullException">Thrown when range is null</exception>
-        public FloatRangeSlider(float min, float max, SizeMode widthMode, StrongBox<FloatRange> range, UIElementOptions options = null)
-            : base(widthMode, SizeMode.Content, options)
-        {
-            _min = min;
-            _max = max;
-
-            RangeBox = range ?? throw new ArgumentNullException(nameof(range));
-            _controlId = GetHashCode();
-        }
-
-        /// <summary>
-        /// Calculates the dynamic size of the range slider based on its content.
-        /// </summary>
-        public override void CalculateDynamicSize()
-        {
-            // RimWorld's FloatRange widget default size - reasonable width and standard height
-            Width = 200f;
-            Height = 31f; // RangeControlIdealHeight from Widgets
-        }
-
-        /// <summary>
-        /// Renders the float range slider using RimWorld's native FloatRange widget.
-        /// </summary>
         protected override void RenderElement()
         {
+            CalculateElementSize();
+
             var rect = CreateRect();
 
-            // Use RimWorld's native FloatRange widget
-            Widgets.FloatRange(rect, _controlId, ref RangeBox.Value, _min, _max, _labelKey, _valueStyle, _gap, _sliderLabelFont, _sliderLabelColor, _roundTo);
+            Widgets.FloatRange(rect, _controlId, ref _range, _min, _max, _labelKey, _valueStyle, _gap, _sliderLabelFont, _sliderLabelColor, _roundTo);
 
-            // Handle tooltip if present
             if (!string.IsNullOrEmpty(_tooltip))
             {
                 TooltipHandler.TipRegion(rect, _tooltip);
             }
         }
 
-        /// <summary>
-        /// Creates a Unity Rect from the range slider's position and size.
-        /// </summary>
-        /// <returns>A Rect representing the range slider's bounds</returns>
         public Rect CreateRect()
         {
             return new Rect(X, Y, Width, Height);
         }
 
-        /// <summary>
-        /// Sets both lower and upper values simultaneously.
-        /// </summary>
-        /// <param name="lowerValue">The new lower bound value</param>
-        /// <param name="upperValue">The new upper bound value</param>
         public void SetValues(float lowerValue, float upperValue)
         {
             float clampedLower = ClampToRange(lowerValue, _min, _max);
             float clampedUpper = ClampToRange(upperValue, _min, _max);
 
-            // Ensure gap is maintained
             if (clampedUpper - clampedLower < _gap)
             {
                 float midpoint = (clampedLower + clampedUpper) / 2f;
                 clampedLower = midpoint - _gap / 2f;
                 clampedUpper = midpoint + _gap / 2f;
 
-                // Re-clamp after gap adjustment
                 clampedLower = ClampToRange(clampedLower, _min, _max - _gap);
                 clampedUpper = ClampToRange(clampedUpper, _min + _gap, _max);
             }
 
-            RangeBox.Value = new FloatRange(clampedLower, clampedUpper);
+            _range = new FloatRange(clampedLower, clampedUpper);
         }
 
-        /// <summary>
-        /// Sets the range to span the entire possible range.
-        /// </summary>
         public void SetToFullRange()
         {
             SetValues(_min, _max);
         }
 
-        /// <summary>
-        /// Sets the range to a single point at the specified value.
-        /// </summary>
-        /// <param name="value">The value to set both min and max to</param>
         public void SetToSingleValue(float value)
         {
             float clampedValue = ClampToRange(value, _min, _max);
-            RangeBox.Value = new FloatRange(clampedValue, clampedValue);
+            _range = new FloatRange(clampedValue, clampedValue);
         }
 
-        /// <summary>
-        /// Clamps a value to the specified range.
-        /// </summary>
-        /// <param name="value">The value to clamp</param>
-        /// <param name="min">The minimum allowed value</param>
-        /// <param name="max">The maximum allowed value</param>
-        /// <returns>The clamped value</returns>
         private float ClampToRange(float value, float min, float max)
         {
             if (value < min) return min;
