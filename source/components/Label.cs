@@ -14,7 +14,14 @@ namespace LessUI
         public string Content
         {
             get => _text;
-            set => _text = value;
+            set
+            {
+                if (_text != value)
+                {
+                    _text = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public string Text
@@ -32,13 +39,27 @@ namespace LessUI
         public bool WordWrap
         {
             get => _wordWrap;
-            set => _wordWrap = value;
+            set
+            {
+                if (_wordWrap != value)
+                {
+                    _wordWrap = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public float? MaxWidth
         {
             get => _maxWidth;
-            set => _maxWidth = value;
+            set
+            {
+                if (_maxWidth != value)
+                {
+                    _maxWidth = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public bool IsEmpty => string.IsNullOrWhiteSpace(_text);
@@ -66,96 +87,123 @@ namespace LessUI
             _tooltip = tooltip ?? "";
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth, intrinsicHeight;
 
-            if (WidthMode == SizeMode.Content)
+            if (IsEmpty)
             {
-                WidthCalculated = true;
+                intrinsicWidth = 1f;
+                intrinsicHeight = GetLineHeight();
+            }
+            else
+            {
+                float availableWidth = _maxWidth ?? float.MaxValue;
+                var originalWordWrap = Verse.Text.WordWrap;
 
-                if (IsEmpty)
+                try
                 {
-                    Width = 1f;
-                }
-                else
-                {
-                    float availableWidth = _maxWidth ?? float.MaxValue;
-                    var originalWordWrap = Verse.Text.WordWrap;
+                    Verse.Text.WordWrap = _wordWrap;
 
-                    try
+                    if (_wordWrap && _maxWidth.HasValue)
                     {
-                        Verse.Text.WordWrap = _wordWrap;
+                        intrinsicWidth = _maxWidth.Value;
+                        intrinsicHeight = Verse.Text.CalcHeight(_text, intrinsicWidth);
+                    }
+                    else if (_wordWrap)
+                    {
+                        float defaultMaxWidth = 300f;
+                        var singleLineWidth = GetTextWidth(_text);
 
-                        if (_wordWrap && _maxWidth.HasValue)
+                        if (singleLineWidth <= defaultMaxWidth)
                         {
-                            Width = _maxWidth.Value;
-                        }
-                        else if (_wordWrap)
-                        {
-                            float defaultMaxWidth = 300f;
-                            var singleLineWidth = GetTextWidth(_text);
-
-                            if (singleLineWidth <= defaultMaxWidth)
-                            {
-                                Width = singleLineWidth;
-                            }
-                            else
-                            {
-                                Width = defaultMaxWidth;
-                            }
+                            intrinsicWidth = singleLineWidth;
+                            intrinsicHeight = GetLineHeight();
                         }
                         else
                         {
-                            Width = GetTextWidth(_text);
+                            intrinsicWidth = defaultMaxWidth;
+                            intrinsicHeight = Verse.Text.CalcHeight(_text, intrinsicWidth);
                         }
-
-                        Width = Math.Max(1f, Width);
                     }
-                    finally
+                    else
                     {
-                        Verse.Text.WordWrap = originalWordWrap;
+                        intrinsicWidth = GetTextWidth(_text);
+                        intrinsicHeight = GetLineHeight();
                     }
+                }
+                finally
+                {
+                    Verse.Text.WordWrap = originalWordWrap;
                 }
             }
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(Math.Max(1f, intrinsicWidth), Math.Max(1f, intrinsicHeight));
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            if (_wordWrap && WidthMode != SizeMode.Content && !IsEmpty)
             {
-                HeightCalculated = true;
-
-                if (IsEmpty)
+                var originalWordWrap = Verse.Text.WordWrap;
+                try
                 {
-                    Height = GetLineHeight();
+                    Verse.Text.WordWrap = true;
+                    resolvedHeight = Verse.Text.CalcHeight(_text, resolvedWidth);
                 }
-                else
+                finally
                 {
-                    var originalWordWrap = Verse.Text.WordWrap;
-
-                    try
-                    {
-                        Verse.Text.WordWrap = _wordWrap;
-
-                        if (_wordWrap && (_maxWidth.HasValue || Width > 0))
-                        {
-                            float widthForHeight = _maxWidth ?? Width;
-                            Height = Verse.Text.CalcHeight(_text, widthForHeight);
-                        }
-                        else
-                        {
-                            Height = GetLineHeight();
-                        }
-
-                        Height = Math.Max(1f, Height);
-                    }
-                    finally
-                    {
-                        Verse.Text.WordWrap = originalWordWrap;
-                    }
+                    Verse.Text.WordWrap = originalWordWrap;
                 }
+            }
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
+            {
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
+        {
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
         {
             if (IsEmpty) return;
 
@@ -165,7 +213,7 @@ namespace LessUI
             {
                 Verse.Text.WordWrap = _wordWrap;
 
-                var rect = CreateRect();
+                var rect = ComputedRect;
 
                 Widgets.Label(rect, _text);
 
@@ -182,7 +230,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
 
         private float GetTextWidth(string text)

@@ -12,7 +12,14 @@ namespace LessUI
         public float HorizontalSpacing
         {
             get => _horizontalSpacing;
-            set => _horizontalSpacing = value;
+            set
+            {
+                if (_horizontalSpacing != value)
+                {
+                    _horizontalSpacing = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public Row(
@@ -50,33 +57,40 @@ namespace LessUI
             _horizontalSpacing = horizontalSpacing ?? 2f;
         }
 
-        protected override float CalculateContentWidthFromChildren()
+        protected override float ComputeIntrinsicWidthFromChildren()
         {
-            float width = Children.Sum(child => child.Width);
+            if (!Children.Any()) return 0f;
+
+            float totalWidth = Children.Sum(child => child.IntrinsicSize.width);
             if (Children.Count > 1)
             {
-                width += _horizontalSpacing * (Children.Count - 1);
+                totalWidth += _horizontalSpacing * (Children.Count - 1);
             }
-
-            return Math.Max(1f, width);
+            return totalWidth;
         }
 
-        protected override float CalculateContentHeightFromChildren()
+        protected override float ComputeIntrinsicHeightFromChildren()
         {
-            float height = Children.Max(child => child.Height);
-            return Math.Max(1f, height);
+            if (!Children.Any()) return 0f;
+            return Children.Max(child => child.IntrinsicSize.height);
         }
 
         protected override void LayoutChildren()
         {
-            float currentX = X;
+            if (!Children.Any()) return;
+
+            float currentX = ComputedX;
+            var availableHeight = ComputedHeight;
 
             foreach (var child in Children)
             {
                 child.X = currentX;
-                child.Y = Y;
+                child.Y = ComputedY;
 
-                currentX += child.Width + _horizontalSpacing;
+                var childContainingBlock = new Size(child.IntrinsicSize.width, availableHeight);
+                child.ResolveLayout(childContainingBlock);
+
+                currentX += child.ComputedWidth + _horizontalSpacing;
             }
         }
     }

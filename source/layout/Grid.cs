@@ -13,6 +13,7 @@ namespace LessUI
         private float _padding = 0f;
         private float _cellWidth = 50f;
         private float _cellHeight = 30f;
+        private bool _explicitCellSize = false;
 
         public int Columns { get; set; } = 1;
         public int Rows { get; set; } = 0;
@@ -20,13 +21,23 @@ namespace LessUI
         public float CellWidth
         {
             get => _cellWidth;
-            set => _cellWidth = value;
+            set
+            {
+                _cellWidth = value;
+                _explicitCellSize = true;
+                InvalidateLayout();
+            }
         }
 
         public float CellHeight
         {
             get => _cellHeight;
-            set => _cellHeight = value;
+            set
+            {
+                _cellHeight = value;
+                _explicitCellSize = true;
+                InvalidateLayout();
+            }
         }
 
         public float ColumnSpacing
@@ -37,6 +48,7 @@ namespace LessUI
                 if (_columnSpacing != value)
                 {
                     _columnSpacing = value;
+                    InvalidateLayout();
                 }
             }
         }
@@ -49,6 +61,7 @@ namespace LessUI
                 if (_rowSpacing != value)
                 {
                     _rowSpacing = value;
+                    InvalidateLayout();
                 }
             }
         }
@@ -61,6 +74,7 @@ namespace LessUI
                 if (_padding != value)
                 {
                     _padding = value;
+                    InvalidateLayout();
                 }
             }
         }
@@ -92,16 +106,7 @@ namespace LessUI
             _columnSpacing = columnSpacing ?? 0f;
             _rowSpacing = rowSpacing ?? 0f;
             _padding = padding ?? 0f;
-
-            if (WidthMode == SizeMode.Fixed && WidthCalculated)
-            {
-                CalculateCellWidthFromFixed();
-            }
-
-            if (HeightMode == SizeMode.Fixed && HeightCalculated)
-            {
-                CalculateCellHeightFromFixed();
-            }
+            _explicitCellSize = cellWidth.HasValue || cellHeight.HasValue;
         }
 
         public Grid(
@@ -132,90 +137,75 @@ namespace LessUI
             _columnSpacing = columnSpacing ?? 0f;
             _rowSpacing = rowSpacing ?? 0f;
             _padding = padding ?? 0f;
+            _explicitCellSize = cellWidth.HasValue || cellHeight.HasValue;
+        }
 
-            if (WidthMode == SizeMode.Fixed && WidthCalculated)
+        protected override Size ComputeIntrinsicSize()
+        {
+            foreach (var child in Children)
             {
-                CalculateCellWidthFromFixed();
+                if (child.NeedsLayout)
+                {
+                    child.CalculateIntrinsicSize();
+                }
             }
 
-            if (HeightMode == SizeMode.Fixed && HeightCalculated)
-            {
-                CalculateCellHeightFromFixed();
-            }
+            var gridSize = CalculateGridIntrinsicSize();
+            return gridSize;
         }
 
-        public override void CalculateFillSize()
+        private Size CalculateGridIntrinsicSize()
         {
-            base.CalculateFillSize();
-
-            if (WidthMode == SizeMode.Fill && Parent != null)
+            if (!_explicitCellSize && Children.Any())
             {
-                CalculateCellWidthFromFill();
+                _cellWidth = Children.Max(child => child.IntrinsicSize.width);
+                _cellHeight = Children.Max(child => child.IntrinsicSize.height);
             }
 
-            if (HeightMode == SizeMode.Fill && Parent != null)
+            int actualRows = CalculateActualRows();
+
+            float intrinsicWidth = (Columns * _cellWidth) + ((Columns - 1) * _columnSpacing) + (2 * _padding);
+            float intrinsicHeight = (actualRows * _cellHeight) + ((actualRows - 1) * _rowSpacing) + (2 * _padding);
+
+            return new Size(intrinsicWidth, intrinsicHeight);
+        }
+
+        private int CalculateActualRows()
+        {
+            if (Rows > 0)
+                return Rows;
+
+            if (Children.Count == 0)
+                return 1;
+
+            return (int)Math.Ceiling((double)Children.Count / Columns);
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            var resolvedSize = base.ComputeResolvedSize(availableSize);
+
+            if (WidthMode == SizeMode.Fill || HeightMode == SizeMode.Fill)
             {
-                CalculateCellHeightFromFill();
+                RecalculateCellSizesForFill(resolvedSize);
             }
+
+            return resolvedSize;
         }
 
-        private void CalculateCellWidthFromFixed()
+        private void RecalculateCellSizesForFill(Size resolvedSize)
         {
-            CellWidth = (Width - (Padding * 2) - (ColumnSpacing * (Columns - 1))) / Columns;
-            CellWidth = Math.Max(1f, CellWidth);
-        }
-
-        private void CalculateCellHeightFromFixed()
-        {
-            CellHeight = (Height - (Padding * 2) - (RowSpacing * (Rows - 1))) / Rows;
-            CellHeight = Math.Max(1f, CellHeight);
-        }
-
-        private void CalculateCellWidthFromFill()
-        {
-            if (Parent != null)
+            if (WidthMode == SizeMode.Fill)
             {
-                float availableWidth = Parent.CalculateFillWidth(this);
-                CellWidth = (availableWidth - (Padding * 2) - (ColumnSpacing * (Columns - 1))) / Columns;
-                CellWidth = Math.Max(1f, CellWidth);
+                float availableWidth = resolvedSize.width - (2 * _padding) - ((Columns - 1) * _columnSpacing);
+                _cellWidth = Math.Max(1f, availableWidth / Columns);
             }
-        }
 
-        private void CalculateCellHeightFromFill()
-        {
-            if (Parent != null)
+            if (HeightMode == SizeMode.Fill && Rows > 0)
             {
-                float availableHeight = Parent.CalculateFillHeight(this);
-                CellHeight = (availableHeight - (Padding * 2) - (RowSpacing * (Rows - 1))) / Rows;
-                CellHeight = Math.Max(1f, CellHeight);
+                float availableHeight = resolvedSize.height - (2 * _padding) - ((Rows - 1) * _rowSpacing);
+                _cellHeight = Math.Max(1f, availableHeight / Rows);
             }
-        }
-
-        public override float CalculateFillWidth(UIElement child)
-        {
-            return CellWidth;
-        }
-
-        public override float CalculateFillHeight(UIElement child)
-        {
-            return CellHeight;
-        }
-
-        protected override float CalculateContentWidthFromChildren()
-        {
-            base.CalculateContentHeightFromChildren();
-            CellWidth = Children.Max(child => child.Width);
-            return (CellWidth * Columns) + (ColumnSpacing * (Columns - 1)) + (Padding * 2);
-        }
-
-        protected override float CalculateContentHeightFromChildren()
-        {
-            base.CalculateContentHeightFromChildren();
-            CellHeight = Children.Max(child => child.Height);
-            int actualRows = Rows > 0 ? Rows : (int)Math.Ceiling((double)Children.Count / Columns);
-            if (actualRows == 0) actualRows = 1;
-
-            return (CellHeight * actualRows) + (RowSpacing * (actualRows - 1)) + (Padding * 2);
         }
 
         protected override void LayoutChildren()
@@ -227,26 +217,29 @@ namespace LessUI
 
                 if (Rows > 0 && row >= Rows) break;
 
-                float cellX = X + Padding + (column * (CellWidth + ColumnSpacing));
-                float cellY = Y + Padding + (row * (CellHeight + RowSpacing));
+                float cellX = ComputedX + _padding + (column * (_cellWidth + _columnSpacing));
+                float cellY = ComputedY + _padding + (row * (_cellHeight + _rowSpacing));
 
                 var alignedPosition = CalculateAlignedPosition(child, cellX, cellY);
                 child.X = alignedPosition.x;
                 child.Y = alignedPosition.y;
+
+                var cellSize = new Size(_cellWidth, _cellHeight);
+                child.ResolveLayout(cellSize);
             }
         }
 
         private (float x, float y) CalculateAlignedPosition(UIElement child, float cellX, float cellY)
         {
-            float alignedX = CalculateAlignedX(child.Alignment, cellX, child.Width);
-            float alignedY = CalculateAlignedY(child.Alignment, cellY, child.Height);
+            float alignedX = CalculateAlignedX(child.Alignment, cellX, child.ComputedWidth);
+            float alignedY = CalculateAlignedY(child.Alignment, cellY, child.ComputedHeight);
 
             return (alignedX, alignedY);
         }
 
         private float CalculateAlignedX(Align alignment, float cellX, float childWidth)
         {
-            if (childWidth >= CellWidth)
+            if (childWidth >= _cellWidth)
             {
                 return cellX;
             }
@@ -261,12 +254,12 @@ namespace LessUI
                 case Align.UpperCenter:
                 case Align.MiddleCenter:
                 case Align.LowerCenter:
-                    return cellX + (CellWidth - childWidth) / 2f;
+                    return cellX + (_cellWidth - childWidth) / 2f;
 
                 case Align.UpperRight:
                 case Align.MiddleRight:
                 case Align.LowerRight:
-                    return cellX + (CellWidth - childWidth);
+                    return cellX + (_cellWidth - childWidth);
 
                 default:
                     return cellX;
@@ -275,7 +268,7 @@ namespace LessUI
 
         private float CalculateAlignedY(Align alignment, float cellY, float childHeight)
         {
-            if (childHeight >= CellHeight)
+            if (childHeight >= _cellHeight)
             {
                 return cellY;
             }
@@ -290,12 +283,12 @@ namespace LessUI
                 case Align.MiddleLeft:
                 case Align.MiddleCenter:
                 case Align.MiddleRight:
-                    return cellY + (CellHeight - childHeight) / 2f;
+                    return cellY + (_cellHeight - childHeight) / 2f;
 
                 case Align.LowerLeft:
                 case Align.LowerCenter:
                 case Align.LowerRight:
-                    return cellY + (CellHeight - childHeight);
+                    return cellY + (_cellHeight - childHeight);
 
                 default:
                     return cellY;
@@ -331,6 +324,7 @@ namespace LessUI
 
             Children.Insert(targetIndex, child);
             child.Parent = this;
+            InvalidateLayout();
         }
 
         public (int column, int row) GetPositionOfChild(UIElement child)
@@ -352,6 +346,6 @@ namespace LessUI
 
         public bool IsFull => AvailableCells == 0;
 
-        public int ActualRows => Children.Count > 0 ? (int)Math.Ceiling((double)Children.Count / Columns) : 0;
+        public int ActualRows => CalculateActualRows();
     }
 }

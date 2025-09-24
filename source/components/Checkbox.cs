@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Verse;
 
@@ -7,7 +8,7 @@ namespace LessUI
     public class Checkbox : UIElement
     {
         private string _tooltip = "";
-        private bool _checked = false;
+        private StrongBox<bool> _checked;
         private string _label = "";
 
         public string Tooltip
@@ -16,7 +17,7 @@ namespace LessUI
             set => _tooltip = value;
         }
 
-        public bool Checked
+        public StrongBox<bool> Checked
         {
             get => _checked;
             set => _checked = value;
@@ -25,14 +26,21 @@ namespace LessUI
         public string Label
         {
             get => _label;
-            set => _label = value;
+            set
+            {
+                if (_label != value)
+                {
+                    _label = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public bool IsEmpty => string.IsNullOrWhiteSpace(_label);
 
         public Checkbox(
             string label = null,
-            bool? isChecked = null,
+            StrongBox<bool> isChecked = null,
             string tooltip = null,
             float? x = null,
             float? y = null,
@@ -47,49 +55,97 @@ namespace LessUI
             : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
             _label = label ?? "";
-            _checked = isChecked ?? false;
+            _checked = isChecked ?? new StrongBox<bool>(false);
             _tooltip = tooltip ?? "";
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth, intrinsicHeight;
 
-            if (WidthMode == SizeMode.Content)
+            if (IsEmpty)
             {
-                WidthCalculated = true;
-                if (IsEmpty)
+                intrinsicWidth = 24f;
+                intrinsicHeight = 24f;
+            }
+            else
+            {
+                var originalWordWrap = Verse.Text.WordWrap;
+                try
                 {
-                    Width = 24f;
-                }
-                else
-                {
-                    var originalWordWrap = Verse.Text.WordWrap;
                     Verse.Text.WordWrap = false;
                     var textSize = Verse.Text.CalcSize(_label);
-                    Width = 24f + 4f + textSize.x;
+                    intrinsicWidth = 24f + 4f + textSize.x;
+                    intrinsicHeight = 24f;
+                }
+                finally
+                {
                     Verse.Text.WordWrap = originalWordWrap;
                 }
             }
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(Math.Max(1f, intrinsicWidth), Math.Max(1f, intrinsicHeight));
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                Height = 24f;
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
 
             if (IsEmpty)
             {
-                Widgets.Checkbox(rect.x, rect.y, ref _checked);
+                Widgets.Checkbox(rect.x, rect.y, ref _checked.Value);
             }
             else
             {
-                Widgets.CheckboxLabeled(rect, _label, ref _checked);
+                Widgets.CheckboxLabeled(rect, _label, ref _checked.Value);
             }
 
             if (!string.IsNullOrEmpty(_tooltip))
@@ -100,7 +156,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
     }
 }

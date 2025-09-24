@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Runtime.CompilerServices;
+using UnityEngine;
 using Verse;
 
 namespace LessUI
@@ -7,7 +8,7 @@ namespace LessUI
     {
         private int _min = 0;
         private int _max = 100;
-        private IntRange _range = new IntRange(0, 100);
+        private StrongBox<IntRange> _range = null;
         private string _tooltip = "";
         private int _controlId;
 
@@ -23,51 +24,56 @@ namespace LessUI
             set => _max = value;
         }
 
+        public IntRange RangeValue
+        {
+            get => _range.Value;
+        }
+
         public int LowerValue
         {
-            get => _range.min;
+            get => RangeValue.min;
             set
             {
                 int newValue = ClampToRange(value, _min, _max);
-                if (newValue > _range.max)
+                if (newValue > RangeValue.max)
                 {
-                    newValue = _range.max;
+                    newValue = RangeValue.max;
                 }
 
-                if (_range.min != newValue)
+                if (RangeValue.min != newValue)
                 {
-                    _range.min = newValue;
+                    _range.Value.min = newValue;
                 }
             }
         }
 
         public int UpperValue
         {
-            get => _range.max;
+            get => RangeValue.max;
             set
             {
                 int newValue = ClampToRange(value, _min, _max);
-                if (newValue < _range.min)
+                if (newValue < RangeValue.min)
                 {
-                    newValue = _range.min;
+                    newValue = RangeValue.min;
                 }
 
-                if (_range.max != newValue)
+                if (RangeValue.max != newValue)
                 {
-                    _range.max = newValue;
+                    _range.Value.max = newValue;
                 }
             }
         }
 
-        public IntRange Range
+        public StrongBox<IntRange> Range
         {
             get => _range;
             set => _range = value;
         }
 
-        public int RangeSpan => _range.max - _range.min;
+        public int RangeSpan => RangeValue.max - RangeValue.min;
 
-        public bool IsValidRange => _range.min <= _range.max;
+        public bool IsValidRange => RangeValue.min <= RangeValue.max;
 
         public int TotalRange => _max - _min;
 
@@ -80,7 +86,7 @@ namespace LessUI
         public IntRangeSlider(
             int? min = null,
             int? max = null,
-            IntRange? range = null,
+            StrongBox<IntRange> range = null,
             string tooltip = null,
             float? x = null,
             float? y = null,
@@ -96,33 +102,69 @@ namespace LessUI
         {
             _min = min ?? 0;
             _max = max ?? 100;
-            _range = range ?? new IntRange(0, 100);
+            _range = range ?? new StrongBox<IntRange>(new IntRange(0, 100));
             _tooltip = tooltip ?? "";
             _controlId = GetHashCode();
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            return new Size(200f, 31f);
+        }
 
-            if (WidthMode == SizeMode.Content)
-            {
-                WidthCalculated = true;
-                Width = 200f;
-            }
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                Height = 31f;
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
 
-            Widgets.IntRange(rect, _controlId, ref _range, _min, _max);
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
+
+            Widgets.IntRange(rect, _controlId, ref _range.Value, _min, _max);
 
             if (!string.IsNullOrEmpty(_tooltip))
             {
@@ -132,31 +174,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
-        }
-
-        public void SetValues(int lowerValue, int upperValue)
-        {
-            int clampedLower = ClampToRange(lowerValue, _min, _max);
-            int clampedUpper = ClampToRange(upperValue, _min, _max);
-
-            if (clampedLower > clampedUpper)
-            {
-                clampedLower = clampedUpper;
-            }
-
-            _range = new IntRange(clampedLower, clampedUpper);
-        }
-
-        public void SetToFullRange()
-        {
-            SetValues(_min, _max);
-        }
-
-        public void SetToSingleValue(int value)
-        {
-            int clampedValue = ClampToRange(value, _min, _max);
-            _range = new IntRange(clampedValue, clampedValue);
+            return ComputedRect;
         }
 
         private int ClampToRange(int value, int min, int max)

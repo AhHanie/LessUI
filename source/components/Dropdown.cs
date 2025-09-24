@@ -25,6 +25,7 @@ namespace LessUI
                 {
                     SelectedItem = default(T);
                 }
+                InvalidateLayout();
             }
         }
 
@@ -43,7 +44,11 @@ namespace LessUI
         public Func<T, string> DisplayTextFunc
         {
             get => _displayTextFunc;
-            set => _displayTextFunc = value ?? (item => item?.ToString() ?? "");
+            set
+            {
+                _displayTextFunc = value ?? (item => item?.ToString() ?? "");
+                InvalidateLayout();
+            }
         }
 
         public string Tooltip
@@ -55,7 +60,14 @@ namespace LessUI
         public string Placeholder
         {
             get => _placeholder;
-            set => _placeholder = value ?? "";
+            set
+            {
+                if (_placeholder != value)
+                {
+                    _placeholder = value ?? "";
+                    InvalidateLayout();
+                }
+            }
         }
 
         public string SelectedDisplayText
@@ -97,40 +109,77 @@ namespace LessUI
             _placeholder = placeholder ?? "";
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth = 150f;
+            float intrinsicHeight = 30f;
 
-            if (WidthMode == SizeMode.Content)
+            if (_items.Any())
             {
-                WidthCalculated = true;
-                float width = 150f;
-
-                if (_items.Any())
-                {
-                    float maxItemWidth = _items.Max(item => GetTextWidth(_displayTextFunc(item)));
-                    width = Math.Max(width, maxItemWidth + 30f);
-                }
-
-                if (!string.IsNullOrEmpty(_placeholder))
-                {
-                    float placeholderWidth = GetTextWidth(_placeholder);
-                    width = Math.Max(width, placeholderWidth + 30f);
-                }
-
-                Width = width;
+                float maxItemWidth = _items.Max(item => GetTextWidth(_displayTextFunc(item)));
+                intrinsicWidth = Math.Max(intrinsicWidth, maxItemWidth + 30f);
             }
 
-            if (HeightMode == SizeMode.Content)
+            if (!string.IsNullOrEmpty(_placeholder))
             {
-                HeightCalculated = true;
-                Height = 30f;
+                float placeholderWidth = GetTextWidth(_placeholder);
+                intrinsicWidth = Math.Max(intrinsicWidth, placeholderWidth + 30f);
+            }
+
+            return new Size(intrinsicWidth, intrinsicHeight);
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
+            {
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
 
             if (Widgets.ButtonText(rect, SelectedDisplayText))
             {
@@ -163,7 +212,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
 
         private float GetTextWidth(string text)

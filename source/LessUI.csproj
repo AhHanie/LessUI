@@ -62,6 +62,7 @@
     <Compile Include="components\Button.cs" />
     <Compile Include="components\ButtonImage.cs" />
     <Compile Include="components\Checkbox.cs" />
+    <Compile Include="components\ColorPicker.cs" />
     <Compile Include="components\Dropdown.cs" />
     <Compile Include="components\Empty.cs" />
     <Compile Include="components\FloatRangeSlider.cs" />
@@ -69,6 +70,7 @@
     <Compile Include="components\Line.cs" />
     <Compile Include="components\RadioButton.cs" />
     <Compile Include="components\Slider.cs" />
+    <Compile Include="components\SliderInt.cs" />
     <Compile Include="components\TextEntry.cs" />
     <Compile Include="components\TextFieldNumeric.cs" />
     <Compile Include="layout\Grid.cs" />
@@ -77,12 +79,11 @@
     <Compile Include="layout\ScrollContainer.cs" />
     <Compile Include="LineType.cs" />
     <Compile Include="ScrollCanvas.cs" />
+    <Compile Include="Size.cs" />
     <Compile Include="SizeMode.cs" />
     <Compile Include="layout\Stack.cs" />
     <Compile Include="UIElement.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="util\TextLineHeightProvider.cs" />
-    <Compile Include="util\TextWidthProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="docs\Canvas.md" />

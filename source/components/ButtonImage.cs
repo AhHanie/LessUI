@@ -14,7 +14,14 @@ namespace LessUI
         public Texture2D Texture
         {
             get => _texture;
-            set => _texture = value;
+            set
+            {
+                if (_texture != value)
+                {
+                    _texture = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public string Tooltip
@@ -58,40 +65,75 @@ namespace LessUI
             _disabled = disabled ?? false;
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth, intrinsicHeight;
 
-            if (WidthMode == SizeMode.Content)
+            if (IsEmpty)
             {
-                WidthCalculated = true;
-                if (IsEmpty)
-                {
-                    Width = 32f;
-                }
-                else
-                {
-                    Width = Math.Max(1f, _texture.width);
-                }
+                intrinsicWidth = 32f;
+                intrinsicHeight = 32f;
+            }
+            else
+            {
+                intrinsicWidth = _texture.width;
+                intrinsicHeight = _texture.height;
             }
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(Math.Max(1f, intrinsicWidth), Math.Max(1f, intrinsicHeight));
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                if (IsEmpty)
-                {
-                    Height = 32f;
-                }
-                else
-                {
-                    Height = Math.Max(1f, _texture.height);
-                }
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
 
             bool wasClicked = Widgets.ButtonImage(rect, _texture);
 
@@ -113,7 +155,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
     }
 }

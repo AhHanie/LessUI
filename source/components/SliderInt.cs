@@ -5,24 +5,50 @@ using Verse;
 
 namespace LessUI
 {
-    public class RadioButton : UIElement
+    public class SliderInt : UIElement
     {
-        private StrongBox<bool> _selected = null;
-        private bool _disabled = false;
+        private StrongBox<int> _value = null;
+        private int _min = 0;
+        private int _max = 100;
         private string _tooltip = "";
         private string _label = "";
-        private bool _clicked = false;
+        private bool _changed = false;
 
-        public StrongBox<bool> Selected
+        public StrongBox<int> Value
         {
-            get => _selected;
-            set => _selected = value;
+            get => _value;
+            set => _value = value;
         }
 
-        public bool Disabled
+        public int ActualValue
         {
-            get => _disabled;
-            set => _disabled = value;
+            get => _value.Value;
+        }
+
+        public int Min
+        {
+            get => _min;
+            set
+            {
+                _min = value;
+                if (ActualValue < _min)
+                {
+                    _value.Value = _min;
+                }
+            }
+        }
+
+        public int Max
+        {
+            get => _max;
+            set
+            {
+                _max = value;
+                if (ActualValue > _max)
+                {
+                    _value.Value = _max;
+                }
+            }
         }
 
         public string Tooltip
@@ -44,18 +70,31 @@ namespace LessUI
             }
         }
 
-        public bool Clicked
+        public bool Changed
         {
-            get => _clicked;
-            set => _clicked = value;
+            get => _changed;
+            set => _changed = value;
         }
+
+        public int Range => _max - _min;
 
         public bool IsEmpty => string.IsNullOrWhiteSpace(_label);
 
-        public RadioButton(
+        public float Percentage
+        {
+            get
+            {
+                if (Range == 0)
+                    return 0f;
+                return (float)(ActualValue - _min) / Range;
+            }
+        }
+
+        public SliderInt(
+            StrongBox<int> value = null,
+            int? min = null,
+            int? max = null,
             string label = null,
-            StrongBox<bool> selected = null,
-            bool? disabled = null,
             string tooltip = null,
             float? x = null,
             float? y = null,
@@ -69,10 +108,18 @@ namespace LessUI
             int? borderThickness = null)
             : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
+            _min = min ?? 0;
+            _max = max ?? 100;
+            _value = value ?? new StrongBox<int>(0);
             _label = label ?? "";
-            _selected = selected ?? new StrongBox<bool>(false);
-            _disabled = disabled ?? false;
             _tooltip = tooltip ?? "";
+        }
+
+        public void SetToPercentage(float percentage)
+        {
+            float clampedPercentage = Mathf.Clamp01(percentage);
+            int newValue = Mathf.RoundToInt(_min + (Range * clampedPercentage));
+            Value.Value = newValue;
         }
 
         protected override Size ComputeIntrinsicSize()
@@ -81,8 +128,8 @@ namespace LessUI
 
             if (IsEmpty)
             {
-                intrinsicWidth = 24f;
-                intrinsicHeight = GetLineHeight();
+                intrinsicWidth = 120f;
+                intrinsicHeight = 22f;
             }
             else
             {
@@ -91,8 +138,8 @@ namespace LessUI
                 {
                     Verse.Text.WordWrap = false;
                     var textSize = Verse.Text.CalcSize(_label);
-                    intrinsicWidth = 24f + 6f + textSize.x;
-                    intrinsicHeight = Math.Max(24f, GetLineHeight());
+                    intrinsicWidth = Math.Max(120f, textSize.x);
+                    intrinsicHeight = GetLineHeight() + 22f;
                 }
                 finally
                 {
@@ -100,7 +147,7 @@ namespace LessUI
                 }
             }
 
-            return new Size(Math.Max(1f, intrinsicWidth), Math.Max(1f, intrinsicHeight));
+            return new Size(intrinsicWidth, intrinsicHeight);
         }
 
         protected override Size ComputeResolvedSize(Size availableSize)
@@ -154,18 +201,34 @@ namespace LessUI
         protected override void PaintElement()
         {
             var rect = ComputedRect;
+            var labelHeight = IsEmpty ? 0f : GetLineHeight();
 
-            bool wasClicked = Widgets.RadioButtonLabeled(rect, _label ?? "", _selected.Value, _disabled);
-
-            if (wasClicked && !_disabled)
+            if (!IsEmpty)
             {
-                _selected.Value = true;
-                _clicked = true;
+                var labelRect = new Rect(rect.x, rect.y, rect.width, labelHeight);
+                var originalAnchor = Verse.Text.Anchor;
+                Verse.Text.Anchor = TextAnchor.UpperCenter;
+                Widgets.Label(labelRect, _label);
+                Verse.Text.Anchor = originalAnchor;
             }
 
-            if (!wasClicked && Clicked)
+            var sliderRect = new Rect(rect.x, rect.y + labelHeight, rect.width, rect.height - labelHeight);
+
+            var originalValue = ActualValue;
+
+            float floatValue = (float)_value.Value;
+            float newFloatValue = Widgets.HorizontalSlider(sliderRect, floatValue, (float)_min, (float)_max,
+                middleAlignment: true, label: null, leftAlignedLabel: null, rightAlignedLabel: null, roundTo: 1f);
+
+            _value.Value = Mathf.RoundToInt(newFloatValue);
+
+            if (ActualValue != originalValue)
             {
-                _clicked = false;
+                _changed = true;
+            }
+            else if (_changed)
+            {
+                _changed = false;
             }
 
             if (!string.IsNullOrEmpty(_tooltip))

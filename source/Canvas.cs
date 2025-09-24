@@ -13,13 +13,18 @@ namespace LessUI
             get => _rect;
             set
             {
-                _rect = value;
-                X = value.x;
-                Y = value.y;
-                Width = value.width;
-                Height = value.height;
+                if (_rect != value)
+                {
+                    _rect = value;
+                    X = value.x;
+                    Y = value.y;
+                    Width = value.width;
+                    Height = value.height;
+                    InvalidateLayout();
+                }
             }
         }
+
         public bool DrawMenuSection
         {
             get => _drawMenuSection;
@@ -48,53 +53,47 @@ namespace LessUI
             {
                 Rect = rect.Value;
             }
-            
+
             if (drawMenuSection.HasValue)
             {
                 _drawMenuSection = drawMenuSection.Value;
             }
         }
 
-        protected override void CalculateElementSize()
+        public override void Render()
         {
-            base.CalculateElementSize();
-
-            if (WidthMode == SizeMode.Content)
+            if (NeedsLayout || HasChildrenNeedingLayout())
             {
-                WidthCalculated = true;
-                Width = _rect.width;
+                RunIntrinsicSizePhase();
+                RunLayoutResolutionPhase();
             }
 
-            if (HeightMode == SizeMode.Content)
-            {
-                HeightCalculated = true;
-                Height = _rect.height;
-            }
+            RunPaintPhase();
         }
 
-        public override void Render()
+        private void RunIntrinsicSizePhase()
+        {
+            CalculateIntrinsicSize();
+        }
+
+        private void RunLayoutResolutionPhase()
+        {
+            var canvasSize = new Size(_rect.width, _rect.height);
+            ResolveLayout(canvasSize);
+        }
+
+        private void RunPaintPhase()
         {
             if (_drawMenuSection)
             {
                 Widgets.DrawMenuSection(_rect);
             }
+
             Widgets.BeginGroup(_rect);
 
             try
             {
-                CalculateElementSize();
-                RenderElement();
-                LayoutChildren();
-
-                foreach (var child in Children)
-                {
-                    child.Render();
-                }
-
-                if (ShowBorders)
-                {
-                    DrawBorders(BorderColor, BorderThickness);
-                }
+                Paint();
             }
             finally
             {
@@ -102,11 +101,48 @@ namespace LessUI
             }
         }
 
-        protected override void LayoutChildren()
+        protected override Size ComputeIntrinsicSize()
         {
+            return new Size(_rect.width, _rect.height);
         }
 
-        protected override void RenderElement()
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            return new Size(_rect.width, _rect.height);
+        }
+
+        protected override void LayoutChildren()
+        {
+            var containingBlockSize = new Size(ComputedWidth, ComputedHeight);
+
+            foreach (var child in Children)
+            {
+                child.X = 0;
+                child.Y = 0;
+
+                child.ResolveLayout(containingBlockSize);
+            }
+        }
+
+        private bool HasChildrenNeedingLayout()
+        {
+            return HasChildrenNeedingLayoutRecursive(this);
+        }
+
+        private bool HasChildrenNeedingLayoutRecursive(UIElement element)
+        {
+            if (element.NeedsLayout) return true;
+
+            foreach (var child in element.Children)
+            {
+                if (HasChildrenNeedingLayoutRecursive(child))
+                    return true;
+            }
+
+            return false;
+        }
+
+        protected override void PaintElement()
         {
         }
 

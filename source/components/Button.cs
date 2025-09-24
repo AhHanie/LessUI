@@ -14,7 +14,14 @@ namespace LessUI
         public string Text
         {
             get => _text;
-            set => _text = value;
+            set
+            {
+                if (_text != value)
+                {
+                    _text = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public string Tooltip
@@ -58,50 +65,86 @@ namespace LessUI
             _disabled = disabled ?? false;
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth, intrinsicHeight;
 
-            if (WidthMode == SizeMode.Content)
+            if (IsEmpty)
             {
-                WidthCalculated = true;
-                if (IsEmpty)
+                intrinsicWidth = 60f;
+                intrinsicHeight = 30f;
+            }
+            else
+            {
+                var originalWordWrap = Verse.Text.WordWrap;
+                try
                 {
-                    Width = 60f;
-                }
-                else
-                {
-                    var originalWordWrap = Verse.Text.WordWrap;
                     Verse.Text.WordWrap = false;
                     var textSize = Verse.Text.CalcSize(_text);
-                    float buttonWidth = textSize.x + 20f;
-                    Width = Math.Max(1f, buttonWidth);
+
+                    intrinsicWidth = textSize.x + 20f;
+                    intrinsicHeight = Math.Max(textSize.y + 10f, 30f);
+                }
+                finally
+                {
                     Verse.Text.WordWrap = originalWordWrap;
                 }
             }
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(Math.Max(1f, intrinsicWidth), Math.Max(1f, intrinsicHeight));
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                if (IsEmpty)
-                {
-                    Height = 30f;
-                }
-                else
-                {
-                    var originalWordWrap = Verse.Text.WordWrap;
-                    Verse.Text.WordWrap = false;
-                    var textSize = Verse.Text.CalcSize(_text);
-                    float buttonHeight = Math.Max(textSize.y + 10f, 30f);
-                    Height = Math.Max(1f, buttonHeight);
-                    Verse.Text.WordWrap = originalWordWrap;
-                }
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
 
             bool wasClicked = Widgets.ButtonText(rect, _text ?? "", drawBackground: true, doMouseoverSound: true, active: !_disabled);
 
@@ -123,7 +166,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
     }
 }

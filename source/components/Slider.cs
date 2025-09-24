@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Verse;
 
@@ -6,7 +7,7 @@ namespace LessUI
 {
     public class Slider : UIElement
     {
-        private float _value = 0f;
+        private StrongBox<float> _value = null;
         private float _min = 0f;
         private float _max = 100f;
         private string _tooltip = "";
@@ -14,10 +15,15 @@ namespace LessUI
         private float _roundTo = -1f;
         private bool _changed = false;
 
-        public float Value
+        public StrongBox<float> Value
         {
             get => _value;
-            set => _value = Mathf.Clamp(value, _min, _max);
+            set => _value = value;
+        }
+
+        public float ActualValue
+        {
+            get => _value.Value;
         }
 
         public float Min
@@ -26,9 +32,9 @@ namespace LessUI
             set
             {
                 _min = value;
-                if (_value < _min)
+                if (ActualValue < _min)
                 {
-                    _value = _min;
+                    _value.Value = _min;
                 }
             }
         }
@@ -39,9 +45,9 @@ namespace LessUI
             set
             {
                 _max = value;
-                if (_value > _max)
+                if (ActualValue > _max)
                 {
-                    _value = _max;
+                    _value.Value = _max;
                 }
             }
         }
@@ -55,7 +61,14 @@ namespace LessUI
         public string Label
         {
             get => _label;
-            set => _label = value;
+            set
+            {
+                if (_label != value)
+                {
+                    _label = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public float RoundTo
@@ -72,10 +85,6 @@ namespace LessUI
 
         public float Range => _max - _min;
 
-        public bool IsAtMin => Mathf.Approximately(_value, _min);
-
-        public bool IsAtMax => Mathf.Approximately(_value, _max);
-
         public bool IsEmpty => string.IsNullOrWhiteSpace(_label);
 
         public float Percentage
@@ -84,12 +93,12 @@ namespace LessUI
             {
                 if (Mathf.Approximately(Range, 0f))
                     return 0f;
-                return (_value - _min) / Range;
+                return (ActualValue - _min) / Range;
             }
         }
 
         public Slider(
-            float? value = null,
+            StrongBox<float> value = null,
             float? min = null,
             float? max = null,
             string label = null,
@@ -109,7 +118,7 @@ namespace LessUI
         {
             _min = min ?? 0f;
             _max = max ?? 100f;
-            _value = Mathf.Clamp(value ?? 0f, _min, _max);
+            _value = value ?? new StrongBox<float>(0f);
             _label = label ?? "";
             _tooltip = tooltip ?? "";
             _roundTo = roundTo ?? -1f;
@@ -118,47 +127,88 @@ namespace LessUI
         public void SetToPercentage(float percentage)
         {
             float clampedPercentage = Mathf.Clamp01(percentage);
-            Value = _min + (Range * clampedPercentage);
+            Value.Value = ActualValue + (Range * clampedPercentage);
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth, intrinsicHeight;
 
-            if (WidthMode == SizeMode.Content)
+            if (IsEmpty)
             {
-                WidthCalculated = true;
-                if (IsEmpty)
+                intrinsicWidth = 120f;
+                intrinsicHeight = 22f;
+            }
+            else
+            {
+                var originalWordWrap = Verse.Text.WordWrap;
+                try
                 {
-                    Width = 120f;
-                }
-                else
-                {
-                    var originalWordWrap = Verse.Text.WordWrap;
                     Verse.Text.WordWrap = false;
                     var textSize = Verse.Text.CalcSize(_label);
-                    Width = Math.Max(120f, textSize.x);
+                    intrinsicWidth = Math.Max(120f, textSize.x);
+                    intrinsicHeight = GetLineHeight() + 22f;
+                }
+                finally
+                {
                     Verse.Text.WordWrap = originalWordWrap;
                 }
             }
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(intrinsicWidth, intrinsicHeight);
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                if (IsEmpty)
-                {
-                    Height = 22f;
-                }
-                else
-                {
-                    Height = GetLineHeight() + 22f;
-                }
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
             var labelHeight = IsEmpty ? 0f : GetLineHeight();
 
             if (!IsEmpty)
@@ -172,12 +222,12 @@ namespace LessUI
 
             var sliderRect = new Rect(rect.x, rect.y + labelHeight, rect.width, rect.height - labelHeight);
 
-            var originalValue = _value;
+            var originalValue = ActualValue;
 
-            _value = Widgets.HorizontalSlider(sliderRect, _value, _min, _max, middleAlignment: true,
+            _value.Value = Widgets.HorizontalSlider(sliderRect, _value.Value, _min, _max, middleAlignment: true,
                 label: null, leftAlignedLabel: null, rightAlignedLabel: null, roundTo: _roundTo);
 
-            if (!Mathf.Approximately(_value, originalValue))
+            if (!Mathf.Approximately(ActualValue, originalValue))
             {
                 _changed = true;
             }
@@ -194,7 +244,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
 
         private float GetLineHeight()

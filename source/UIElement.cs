@@ -2,7 +2,6 @@
 using UnityEngine;
 using Verse;
 using System.Linq;
-using System;
 
 namespace LessUI
 {
@@ -14,10 +13,12 @@ namespace LessUI
         private bool _showBorders = false;
         private Color _borderColor = Color.white;
         private int _borderThickness = 1;
-        private bool isCalculatingSize = false; 
 
-        private bool widthCalculated = false;
-        private bool heightCalculated = false;
+        private bool _needsLayout = true;
+        private bool _layoutInProgress = false;
+        private Rect _computedRect = Rect.zero;
+        private Size _intrinsicSize = Size.zero;
+        private Size _availableSize = Size.zero;
 
         public float X { get; set; }
         public float Y { get; set; }
@@ -26,31 +27,38 @@ namespace LessUI
         public float Width
         {
             get => _width;
-            set => _width = value;
+            set
+            {
+                if (_width != value)
+                {
+                    _width = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public float Height
         {
             get => _height;
-            set => _height = value;
+            set
+            {
+                if (_height != value)
+                {
+                    _height = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
-        public bool WidthCalculated
-        {
-            get => widthCalculated;
-            set => widthCalculated = value;
-        }
-        public bool HeightCalculated
-        {
-            get => heightCalculated;
-            set => heightCalculated = value;
-        }
+        public float ComputedWidth => _computedRect.width;
+        public float ComputedHeight => _computedRect.height;
+        public float ComputedX => _computedRect.x;
+        public float ComputedY => _computedRect.y;
+        public Rect ComputedRect => _computedRect;
 
-        public bool IsCalculatingSize
-        {
-            get => isCalculatingSize;
-            set => isCalculatingSize = value;
-        }
+        public Size IntrinsicSize => _intrinsicSize;
+
+        public Size AvailableSize => _availableSize;
 
         public SizeMode WidthMode { get; set; }
         public SizeMode HeightMode { get; set; }
@@ -82,10 +90,14 @@ namespace LessUI
                 if (_parent != value)
                 {
                     _parent = value;
+                    InvalidateLayout();
                     OnParentSet();
                 }
             }
         }
+
+        public bool NeedsLayout => _needsLayout;
+        public bool IsLayoutInProgress => _layoutInProgress;
 
         public UIElement(
            float? x = null,
@@ -109,16 +121,6 @@ namespace LessUI
             Children = new List<UIElement>();
             _parent = null;
 
-            if (width.HasValue)
-            {
-                widthCalculated = true;
-                WidthMode = SizeMode.Fixed;
-            }
-            if (height.HasValue)
-            {
-                heightCalculated = true;
-                HeightMode = SizeMode.Fixed;
-            }
             if (showBorders.HasValue) _showBorders = showBorders.Value;
             if (borderColor.HasValue) _borderColor = borderColor.Value;
             if (borderThickness.HasValue) _borderThickness = borderThickness.Value;
@@ -145,118 +147,147 @@ namespace LessUI
             }
         }
 
-        public virtual void OnParentSet()
+        public void InvalidateLayout()
         {
+            if (_needsLayout) return;
+
+            _needsLayout = true;
+
+            _parent?.InvalidateLayout();
         }
 
-        protected virtual void ApplyDefaultSettings()
+        public void InvalidateLayoutRecursive()
         {
-
-        }
-
-        public virtual float CalculateFillWidth(UIElement child)
-        {
-            if (isCalculatingSize)
+            _needsLayout = true;
+            foreach (var child in Children)
             {
-                throw new Exception("Recursive cycle detected with size calculations");
-            }
-            return Width;
-        }
-
-        public virtual float CalculateFillHeight(UIElement child)
-        {
-            if (isCalculatingSize)
-            {
-                throw new Exception("Recursive cycle detected with size calculations");
-            }
-            return Height;
-        }
-
-        public virtual void CalculateFillSize()
-        {
-            if (WidthMode == SizeMode.Fill && Parent != null)
-            {
-                _width = Parent.CalculateFillWidth(this);
-                widthCalculated = true;
-            }
-
-            if (HeightMode == SizeMode.Fill && Parent != null)
-            {
-                _height = Parent.CalculateFillHeight(this);
-                heightCalculated = true;
+                child.InvalidateLayoutRecursive();
             }
         }
 
-        public virtual void CalculateContentSizeFromChildren()
+        public virtual void CalculateIntrinsicSize()
         {
-            if (WidthMode == SizeMode.Content)
-            {
-                _width = CalculateContentWidthFromChildren();
-                widthCalculated = true;
-            }
+            if (_layoutInProgress) return;
+            _layoutInProgress = true;
 
-            if (HeightMode == SizeMode.Content)
+            try
             {
-                _height = CalculateContentHeightFromChildren();
-                heightCalculated = true;
+                foreach (var child in Children)
+                {
+                    child.CalculateIntrinsicSize();
+                }
+
+                _intrinsicSize = ComputeIntrinsicSize();
+            }
+            finally
+            {
+                _layoutInProgress = false;
             }
         }
 
-        protected virtual void CalculateElementSize()
+        protected virtual Size ComputeIntrinsicSize()
         {
-            CalculateFillSize();
+            float intrinsicWidth = 0f;
+            float intrinsicHeight = 0f;
 
             if (Children.Any())
             {
-                CalculateContentSizeFromChildren();
+                intrinsicWidth = ComputeIntrinsicWidthFromChildren();
+                intrinsicHeight = ComputeIntrinsicHeightFromChildren();
             }
+            else
+            {
+                intrinsicWidth = _width > 0 ? _width : 10f;
+                intrinsicHeight = _height > 0 ? _height : 10f;
+            }
+
+            return new Size(intrinsicWidth, intrinsicHeight);
         }
 
-        protected virtual float CalculateContentWidthFromChildren()
+        protected virtual float ComputeIntrinsicWidthFromChildren()
         {
-            float width = 0f;
-            foreach (UIElement child in Children)
-            {
-                if (!child.WidthCalculated)
-                {
-                    child.CalculateElementSize();
-                }
-                width += child.Width;
-            }
-            return width;
+            return Children.Sum(child => child.IntrinsicSize.width);
         }
 
-        protected virtual float CalculateContentHeightFromChildren()
+        protected virtual float ComputeIntrinsicHeightFromChildren()
         {
-            float height = 0f;
-            foreach (UIElement child in Children)
-            {
-                if (!child.HeightCalculated)
-                {
-                    child.CalculateElementSize();
-                }
-                height += child.Height;
-            }
-            return height;
+            return Children.Any() ? Children.Max(child => child.IntrinsicSize.height) : 0f;
         }
 
-        public virtual void Render()
+        public virtual void ResolveLayout(Size availableSize)
         {
-            if (isCalculatingSize)
-            {
-                throw new Exception("Recursive cycle detected with size calculations");
-            }
-            isCalculatingSize = true;
-            CalculateElementSize();
-            isCalculatingSize = false;
+            _availableSize = availableSize;
 
-            RenderElement();
+            var resolvedSize = ComputeResolvedSize(availableSize);
+
+            _computedRect = new Rect(X, Y, resolvedSize.width, resolvedSize.height);
 
             LayoutChildren();
 
+            _needsLayout = false;
+        }
+
+        protected virtual Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected virtual float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
+            {
+                case SizeMode.Fixed:
+                    return _width > 0 ? _width : _intrinsicSize.width;
+
+                case SizeMode.Content:
+                    return _intrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return _intrinsicSize.width;
+            }
+        }
+
+        protected virtual float ComputeResolvedHeight(float availableHeight)
+        {
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return _height > 0 ? _height : _intrinsicSize.height;
+
+                case SizeMode.Content:
+                    return _intrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return _intrinsicSize.height;
+            }
+        }
+
+        protected virtual void LayoutChildren()
+        {
+            var childAvailableSize = new Size(ComputedWidth, ComputedHeight);
+
             foreach (var child in Children)
             {
-                child.Render();
+                child.ResolveLayout(childAvailableSize);
+            }
+        }
+
+        public virtual void Paint()
+        {
+            PaintElement();
+
+            foreach (var child in Children)
+            {
+                child.Paint();
             }
 
             if (_showBorders)
@@ -265,12 +296,22 @@ namespace LessUI
             }
         }
 
-        protected virtual void LayoutChildren()
+        protected virtual void PaintElement()
         {
         }
 
-        protected virtual void RenderElement()
+        public virtual void Render()
         {
+
+            if (NeedsLayout)
+            {
+                CalculateIntrinsicSize();
+
+                var availableSize = new Size(_width > 0 ? _width : 800f, _height > 0 ? _height : 600f);
+                ResolveLayout(availableSize);
+            }
+
+            Paint();
         }
 
         public void DrawBorders()
@@ -285,13 +326,12 @@ namespace LessUI
 
         public void DrawBorders(Color color, int thickness)
         {
-            if (thickness <= 0 || Width <= 0 || Height <= 0)
+            if (thickness <= 0 || ComputedWidth <= 0 || ComputedHeight <= 0)
             {
                 return;
             }
 
-            var borderRect = new Rect(X, Y, Width, Height);
-            DrawBorderInternal(borderRect, color, thickness);
+            DrawBorderInternal(ComputedRect, color, thickness);
         }
 
         protected virtual void DrawBorderInternal(Rect rect, Color color, int thickness)
@@ -333,6 +373,7 @@ namespace LessUI
 
             Children.Add(child);
             child.Parent = this;
+            InvalidateLayout();
             return this;
         }
 
@@ -346,9 +387,14 @@ namespace LessUI
             if (Children.Remove(child))
             {
                 child.Parent = null;
+                InvalidateLayout();
             }
 
             return this;
+        }
+
+        public virtual void OnParentSet()
+        {
         }
     }
 }

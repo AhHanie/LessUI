@@ -13,6 +13,7 @@ namespace LessUI
         private bool _showScrollbars = true;
         private float _padding = 0f;
         private float _verticalSpacing = 2f;
+        private Rect _contentBounds = Rect.zero;
 
         public Vector2 ScrollPosition
         {
@@ -31,13 +32,27 @@ namespace LessUI
         public float Padding
         {
             get => _padding;
-            set => _padding = value;
+            set
+            {
+                if (_padding != value)
+                {
+                    _padding = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public float VerticalSpacing
         {
             get => _verticalSpacing;
-            set => _verticalSpacing = value;
+            set
+            {
+                if (_verticalSpacing != value)
+                {
+                    _verticalSpacing = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public ScrollContainer(
@@ -87,48 +102,122 @@ namespace LessUI
             _scrollPositionBox = scrollPosition ?? new StrongBox<Vector2>(Vector2.zero);
         }
 
-        protected override float CalculateContentWidthFromChildren()
+        protected override Size ComputeIntrinsicSize()
         {
-            float width = Children.Max(child => child.Width);
-            width += _padding * 2f;
-            return Math.Max(1f, width);
+            foreach (var child in Children)
+            {
+                if (child.NeedsLayout)
+                {
+                    child.CalculateIntrinsicSize();
+                }
+            }
+
+            var contentSize = CalculateContentSize();
+            return contentSize;
         }
 
-        protected override float CalculateContentHeightFromChildren()
+        private Size CalculateContentSize()
         {
-            float height = Children.Sum(child => child.Height);
+            if (!Children.Any())
+            {
+                return new Size(_padding * 2f, _padding * 2f);
+            }
+
+            float contentWidth = Children.Max(child => child.IntrinsicSize.width) + (_padding * 2f);
+            float contentHeight = Children.Sum(child => child.IntrinsicSize.height);
+
             if (Children.Count > 1)
             {
-                height += VerticalSpacing * (Children.Count - 1);
+                contentHeight += _verticalSpacing * (Children.Count - 1);
             }
-            height += _padding * 2f;
+            contentHeight += _padding * 2f;
 
-            return Math.Max(1f, height);
+            return new Size(Math.Max(1f, contentWidth), Math.Max(1f, contentHeight));
         }
 
-        public Rect GetRect()
+        protected override Size ComputeResolvedSize(Size availableSize)
         {
-            return new Rect(X, Y, Width, Height);
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
         }
 
-        public Rect CalculateScrollRect()
+        protected override float ComputeResolvedWidth(float availableWidth)
         {
-            var containerRect = GetRect();
-            float paddedX = containerRect.x + _padding;
-            float paddedY = containerRect.y + _padding;
-            float paddedWidth = Mathf.Max(1f, containerRect.width - (_padding * 2f));
-            float paddedHeight = Mathf.Max(1f, containerRect.height - (_padding * 2f));
+            switch (WidthMode)
+            {
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
 
-            return new Rect(paddedX, paddedY, paddedWidth, paddedHeight);
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
+            }
         }
 
-        public Rect CalculateViewRect()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            Rect containerRect;
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+            var contentArea = CalculateContentArea();
+            var availableWidth = contentArea.width;
+
+            float currentY = contentArea.y;
+
+            foreach (var child in Children)
+            {
+                child.X = contentArea.x;
+                child.Y = currentY;
+
+                var childContainingBlock = new Size(availableWidth, child.IntrinsicSize.height);
+                child.ResolveLayout(childContainingBlock);
+
+                currentY += child.ComputedHeight + _verticalSpacing;
+            }
+
+            CalculateContentBounds();
+        }
+
+        private Rect CalculateContentArea()
+        {
+            float contentX = ComputedX + _padding;
+            float contentY = ComputedY + _padding;
+            float contentWidth = Mathf.Max(1f, ComputedWidth - (_padding * 2f));
+            float contentHeight = Mathf.Max(1f, ComputedHeight - (_padding * 2f));
+
+            return new Rect(contentX, contentY, contentWidth, contentHeight);
+        }
+
+        private void CalculateContentBounds()
+        {
+            var contentArea = CalculateContentArea();
+
             if (Children.Count == 0)
             {
-                containerRect = GetRect();
-                return containerRect;
+                _contentBounds = contentArea;
+                return;
             }
 
             float minX = float.MaxValue;
@@ -138,68 +227,65 @@ namespace LessUI
 
             foreach (var child in Children)
             {
-                minX = Mathf.Min(minX, child.X);
-                minY = Mathf.Min(minY, child.Y);
-                maxX = Mathf.Max(maxX, child.X + child.Width);
-                maxY = Mathf.Max(maxY, child.Y + child.Height);
+                minX = Mathf.Min(minX, child.ComputedX);
+                minY = Mathf.Min(minY, child.ComputedY);
+                maxX = Mathf.Max(maxX, child.ComputedX + child.ComputedWidth);
+                maxY = Mathf.Max(maxY, child.ComputedY + child.ComputedHeight);
             }
 
             float contentWidth = maxX - minX;
             float contentHeight = maxY - minY;
 
-            float viewX = minX;
-            float viewY = minY;
-            float viewWidth = contentWidth;
-            float viewHeight = contentHeight;
+            contentWidth = Mathf.Max(contentWidth, contentArea.width);
+            contentHeight = Mathf.Max(contentHeight, contentArea.height);
 
-            containerRect = GetRect();
-            bool contentFitsInContainer = minX >= containerRect.x && maxX <= (containerRect.x + containerRect.width) &&
-                                        minY >= containerRect.y && maxY <= (containerRect.y + containerRect.height);
-
-            if (contentFitsInContainer && (contentWidth < containerRect.width || contentHeight < containerRect.height))
-            {
-                viewX = containerRect.x;
-                viewY = containerRect.y;
-                viewWidth = Mathf.Max(contentWidth, containerRect.width);
-                viewHeight = Mathf.Max(contentHeight, containerRect.height);
-            }
-
-            return new Rect(viewX, viewY, viewWidth, viewHeight);
+            _contentBounds = new Rect(minX, minY, contentWidth, contentHeight);
         }
 
-        public override void Render()
+        protected override void PaintElement()
         {
-            CalculateFillSize();
+            var contentArea = CalculateContentArea();
+            var containerRect = ComputedRect;
 
-            RenderElement();
-
-            LayoutChildren();
-
-            var viewRect = CalculateViewRect();
-            var scrollRect = CalculateScrollRect();
-
-            var containerRect = GetRect();
             Widgets.DrawMenuSection(containerRect);
 
-            Widgets.BeginScrollView(scrollRect, ref _scrollPositionBox.Value, viewRect, _showScrollbars);
+            Widgets.BeginScrollView(contentArea, ref _scrollPositionBox.Value, _contentBounds, _showScrollbars);
 
-            foreach (var child in Children)
+            try
             {
-                child.Render();
+                foreach (var child in Children)
+                {
+                    child.Paint();
+                }
             }
-
-            CalculateContentSizeFromChildren();
-
-            if (ShowBorders)
+            finally
             {
-                DrawBorders(BorderColor, BorderThickness);
+                Widgets.EndScrollView();
             }
-
-            Widgets.EndScrollView();
         }
 
-        protected override void RenderElement()
+        public Rect GetRect()
         {
+            return ComputedRect;
+        }
+
+        public Rect GetContentBounds()
+        {
+            return _contentBounds;
+        }
+
+        public Rect GetContentArea()
+        {
+            return CalculateContentArea();
+        }
+
+        public bool ContentOverflows
+        {
+            get
+            {
+                var contentArea = CalculateContentArea();
+                return _contentBounds.width > contentArea.width || _contentBounds.height > contentArea.height;
+            }
         }
     }
 }

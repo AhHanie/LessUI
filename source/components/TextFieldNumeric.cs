@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Verse;
 
@@ -6,7 +7,7 @@ namespace LessUI
 {
     public class TextFieldNumeric<T> : UIElement where T : struct
     {
-        private T _value = default(T);
+        private StrongBox<T> _value = null;
         private string _buffer = "";
         private T _min;
         private T _max;
@@ -14,7 +15,7 @@ namespace LessUI
         private string _label = "";
         private bool _changed = false;
 
-        public T Value
+        public StrongBox<T> Value
         {
             get => _value;
             set => _value = value;
@@ -47,7 +48,14 @@ namespace LessUI
         public string Label
         {
             get => _label;
-            set => _label = value;
+            set
+            {
+                if (_label != value)
+                {
+                    _label = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public bool Changed
@@ -59,7 +67,7 @@ namespace LessUI
         public bool IsEmpty => string.IsNullOrWhiteSpace(_label);
 
         public TextFieldNumeric(
-            T? value = null,
+            StrongBox<T> value = null,
             T? min = null,
             T? max = null,
             string buffer = null,
@@ -79,7 +87,7 @@ namespace LessUI
         {
             SetDefaultMinMax();
 
-            _value = value ?? default(T);
+            _value = value ?? new StrongBox<T>(default(T));
             _min = min ?? _min;
             _max = max ?? _max;
             _buffer = buffer ?? "";
@@ -111,44 +119,85 @@ namespace LessUI
             }
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth, intrinsicHeight;
 
-            if (WidthMode == SizeMode.Content)
+            if (IsEmpty)
             {
-                WidthCalculated = true;
-                if (IsEmpty)
+                intrinsicWidth = 120f;
+                intrinsicHeight = GetLineHeight();
+            }
+            else
+            {
+                var originalWordWrap = Verse.Text.WordWrap;
+                try
                 {
-                    Width = 120f;
-                }
-                else
-                {
-                    var originalWordWrap = Verse.Text.WordWrap;
                     Verse.Text.WordWrap = false;
                     var textSize = Verse.Text.CalcSize(_label);
-                    Width = Math.Max(120f, textSize.x);
+                    intrinsicWidth = Math.Max(120f, textSize.x);
+                    intrinsicHeight = GetLineHeight() + GetLineHeight();
+                }
+                finally
+                {
                     Verse.Text.WordWrap = originalWordWrap;
                 }
             }
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(intrinsicWidth, intrinsicHeight);
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                if (IsEmpty)
-                {
-                    Height = GetLineHeight();
-                }
-                else
-                {
-                    Height = GetLineHeight() + GetLineHeight();
-                }
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
             var labelHeight = IsEmpty ? 0f : GetLineHeight();
 
             if (!IsEmpty)
@@ -162,9 +211,9 @@ namespace LessUI
 
             var textFieldRect = new Rect(rect.x, rect.y + labelHeight, rect.width, rect.height - labelHeight);
 
-            T originalValue = _value;
+            T originalValue = _value.Value;
 
-            Widgets.TextFieldNumeric(textFieldRect, ref _value, ref _buffer, ConvertToFloat(_min), ConvertToFloat(_max));
+            Widgets.TextFieldNumeric(textFieldRect, ref _value.Value, ref _buffer, ConvertToFloat(_min), ConvertToFloat(_max));
 
             if (!_value.Equals(originalValue))
             {
@@ -183,7 +232,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
 
         private float GetLineHeight()

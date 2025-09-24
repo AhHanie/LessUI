@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Verse;
 
@@ -6,17 +7,17 @@ namespace LessUI
 {
     public class TextEntry : UIElement
     {
-        private string _text = "";
+        private StrongBox<string> _text = null;
         private string _tooltip = "";
         private string _label = "";
         private int _lineCount = 1;
         private int? _maxLength = null;
         private bool _changed = false;
 
-        public string Text
+        public StrongBox<string> Text
         {
             get => _text;
-            set => _text = value ?? "";
+            set => _text = value;
         }
 
         public string Tooltip
@@ -28,13 +29,28 @@ namespace LessUI
         public string Label
         {
             get => _label;
-            set => _label = value;
+            set
+            {
+                if (_label != value)
+                {
+                    _label = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public int LineCount
         {
             get => _lineCount;
-            set => _lineCount = Math.Max(1, value);
+            set
+            {
+                int newLineCount = Math.Max(1, value);
+                if (_lineCount != newLineCount)
+                {
+                    _lineCount = newLineCount;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public int? MaxLength
@@ -54,7 +70,7 @@ namespace LessUI
         public bool IsEmpty => string.IsNullOrWhiteSpace(_label);
 
         public TextEntry(
-            string text = null,
+            StrongBox<string> text = null,
             string label = null,
             string tooltip = null,
             int? lineCount = null,
@@ -71,55 +87,95 @@ namespace LessUI
             int? borderThickness = null)
             : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
-            _text = text ?? "";
+            _text = text ?? new StrongBox<string>("");
             _label = label ?? "";
             _tooltip = tooltip ?? "";
             _lineCount = Math.Max(1, lineCount ?? 1);
             _maxLength = maxLength;
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth, intrinsicHeight;
 
-            if (WidthMode == SizeMode.Content)
+            if (IsEmpty)
             {
-                WidthCalculated = true;
-                if (IsEmpty)
+                intrinsicWidth = 150f;
+                intrinsicHeight = Math.Max(1f, GetLineHeight() * _lineCount);
+            }
+            else
+            {
+                var originalWordWrap = Verse.Text.WordWrap;
+                try
                 {
-                    Width = 150f;
-                }
-                else
-                {
-                    var originalWordWrap = Verse.Text.WordWrap;
                     Verse.Text.WordWrap = false;
                     var textSize = Verse.Text.CalcSize(_label);
-                    Width = Math.Max(150f, textSize.x); // Use larger of default text entry width or label width
+                    intrinsicWidth = Math.Max(150f, textSize.x);
+                    var textEntryHeight = Math.Max(1f, GetLineHeight() * _lineCount);
+                    intrinsicHeight = GetLineHeight() + textEntryHeight;
+                }
+                finally
+                {
                     Verse.Text.WordWrap = originalWordWrap;
                 }
             }
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(intrinsicWidth, intrinsicHeight);
+        }
+
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                var textEntryHeight = Math.Max(1f, GetLineHeight() * _lineCount);
-                if (IsEmpty)
-                {
-                    Height = textEntryHeight;
-                }
-                else
-                {
-                    Height = GetLineHeight() + textEntryHeight; // Label height + text entry height
-                }
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
             var labelHeight = IsEmpty ? 0f : GetLineHeight();
 
-            // Render label above the text entry if present
             if (!IsEmpty)
             {
                 var labelRect = new Rect(rect.x, rect.y, rect.width, labelHeight);
@@ -129,19 +185,18 @@ namespace LessUI
                 Verse.Text.Anchor = originalAnchor;
             }
 
-            // Render the text entry below the label (or at the top if no label)
             var textEntryRect = new Rect(rect.x, rect.y + labelHeight, rect.width, rect.height - labelHeight);
 
-            string originalText = _text;
+            string originalText = _text.Value;
             string newText;
 
             if (IsMultiLine)
             {
-                newText = Widgets.TextArea(textEntryRect, _text);
+                newText = Widgets.TextArea(textEntryRect, _text.Value);
             }
             else
             {
-                newText = Widgets.TextField(textEntryRect, _text);
+                newText = Widgets.TextField(textEntryRect, _text.Value);
             }
 
             if (_maxLength.HasValue && newText.Length > _maxLength.Value)
@@ -151,7 +206,7 @@ namespace LessUI
 
             if (newText != originalText)
             {
-                _text = newText;
+                _text.Value = newText;
                 _changed = true;
             }
             else if (_changed)
@@ -167,7 +222,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
 
         private float GetLineHeight()

@@ -14,13 +14,28 @@ namespace LessUI
         public LineType LineType
         {
             get => _lineType;
-            set => _lineType = value;
+            set
+            {
+                if (_lineType != value)
+                {
+                    _lineType = value;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public float Thickness
         {
             get => _thickness;
-            set => _thickness = Mathf.Max(0.1f, value);
+            set
+            {
+                float newThickness = Mathf.Max(0.1f, value);
+                if (_thickness != newThickness)
+                {
+                    _thickness = newThickness;
+                    InvalidateLayout();
+                }
+            }
         }
 
         public Color Color
@@ -58,26 +73,65 @@ namespace LessUI
             _tooltip = tooltip ?? "";
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth = (_lineType == LineType.Horizontal) ? 100f : Math.Max(0.1f, _thickness);
+            float intrinsicHeight = (_lineType == LineType.Horizontal) ? Math.Max(0.1f, _thickness) : 100f;
 
-            if (WidthMode == SizeMode.Content)
-            {
-                WidthCalculated = true;
-                Width = (_lineType == LineType.Horizontal) ? 100f : Math.Max(0.1f, _thickness);
-            }
+            return new Size(intrinsicWidth, intrinsicHeight);
+        }
 
-            if (HeightMode == SizeMode.Content)
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
+
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                Height = (_lineType == LineType.Horizontal) ? Math.Max(0.1f, _thickness) : 100f;
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            var rect = CreateRect();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
+
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
             var originalColor = GUI.color;
 
             try
@@ -162,7 +216,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
+            return ComputedRect;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Runtime.CompilerServices;
+using UnityEngine;
 using Verse;
 
 namespace LessUI
@@ -7,7 +8,7 @@ namespace LessUI
     {
         private float _min = 0f;
         private float _max = 100f;
-        private FloatRange _range = new FloatRange(0f, 100f);
+        private StrongBox<FloatRange> _range = null;
         private string _tooltip = "";
         private string _labelKey = "";
         private ToStringStyle _valueStyle = ToStringStyle.FloatTwo;
@@ -29,51 +30,56 @@ namespace LessUI
             set => _max = value;
         }
 
+        public FloatRange RangeValue
+        {
+            get => _range.Value;
+        }
+
         public float LowerValue
         {
-            get => _range.min;
+            get => RangeValue.min;
             set
             {
                 float newValue = ClampToRange(value, _min, _max);
-                if (newValue > _range.max - _gap)
+                if (newValue > RangeValue.max - _gap)
                 {
-                    newValue = _range.max - _gap;
+                    newValue = RangeValue.max - _gap;
                 }
 
-                if (!Mathf.Approximately(_range.min, newValue))
+                if (!Mathf.Approximately(RangeValue.min, newValue))
                 {
-                    _range.min = newValue;
+                    _range.Value.min = newValue;
                 }
             }
         }
 
         public float UpperValue
         {
-            get => _range.max;
+            get => RangeValue.max;
             set
             {
                 float newValue = ClampToRange(value, _min, _max);
-                if (newValue < _range.min + _gap)
+                if (newValue < RangeValue.min + _gap)
                 {
-                    newValue = _range.min + _gap;
+                    newValue = RangeValue.min + _gap;
                 }
 
-                if (!Mathf.Approximately(_range.max, newValue))
+                if (!Mathf.Approximately(RangeValue.max, newValue))
                 {
-                    _range.max = newValue;
+                    _range.Value.max = newValue;
                 }
             }
         }
 
-        public FloatRange Range
+        public StrongBox<FloatRange> Range
         {
             get => _range;
             set => _range = value;
         }
 
-        public float RangeSpan => _range.max - _range.min;
+        public float RangeSpan => RangeValue.max - RangeValue.min;
 
-        public bool IsValidRange => _range.min <= _range.max;
+        public bool IsValidRange => RangeValue.min <= RangeValue.max;
 
         public float TotalRange => _max - _min;
 
@@ -122,7 +128,7 @@ namespace LessUI
         public FloatRangeSlider(
             float? min = null,
             float? max = null,
-            FloatRange? range = null,
+            StrongBox<FloatRange> range = null,
             string labelKey = null,
             string tooltip = null,
             ToStringStyle? valueStyle = null,
@@ -144,7 +150,7 @@ namespace LessUI
         {
             _min = min ?? 0f;
             _max = max ?? 100f;
-            _range = range ?? new FloatRange(0f, 100f);
+            _range = range ?? new StrongBox<FloatRange>(new FloatRange(0f, 100f));
             _labelKey = labelKey ?? "";
             _tooltip = tooltip ?? "";
             _valueStyle = valueStyle ?? ToStringStyle.FloatTwo;
@@ -155,30 +161,64 @@ namespace LessUI
             _controlId = GetHashCode();
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            return new Size(200f, 31f);
+        }
 
-            if (WidthMode == SizeMode.Content)
-            {
-                WidthCalculated = true;
-                Width = 200f;
-            }
+        protected override Size ComputeResolvedSize(Size availableSize)
+        {
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
 
-            if (HeightMode == SizeMode.Content)
+            return new Size(resolvedWidth, resolvedHeight);
+        }
+
+        protected override float ComputeResolvedWidth(float availableWidth)
+        {
+            switch (WidthMode)
             {
-                HeightCalculated = true;
-                Height = 31f;
+                case SizeMode.Fixed:
+                    return Width > 0 ? Width : IntrinsicSize.width;
+
+                case SizeMode.Content:
+                    return IntrinsicSize.width;
+
+                case SizeMode.Fill:
+                    return availableWidth;
+
+                default:
+                    return IntrinsicSize.width;
             }
         }
 
-        protected override void RenderElement()
+        protected override float ComputeResolvedHeight(float availableHeight)
         {
-            CalculateElementSize();
+            switch (HeightMode)
+            {
+                case SizeMode.Fixed:
+                    return Height > 0 ? Height : IntrinsicSize.height;
 
-            var rect = CreateRect();
+                case SizeMode.Content:
+                    return IntrinsicSize.height;
 
-            Widgets.FloatRange(rect, _controlId, ref _range, _min, _max, _labelKey, _valueStyle, _gap, _sliderLabelFont, _sliderLabelColor, _roundTo);
+                case SizeMode.Fill:
+                    return availableHeight;
+
+                default:
+                    return IntrinsicSize.height;
+            }
+        }
+
+        protected override void LayoutChildren()
+        {
+        }
+
+        protected override void PaintElement()
+        {
+            var rect = ComputedRect;
+
+            Widgets.FloatRange(rect, _controlId, ref _range.Value, _min, _max, _labelKey, _valueStyle, _gap, _sliderLabelFont, _sliderLabelColor, _roundTo);
 
             if (!string.IsNullOrEmpty(_tooltip))
             {
@@ -188,36 +228,7 @@ namespace LessUI
 
         public Rect CreateRect()
         {
-            return new Rect(X, Y, Width, Height);
-        }
-
-        public void SetValues(float lowerValue, float upperValue)
-        {
-            float clampedLower = ClampToRange(lowerValue, _min, _max);
-            float clampedUpper = ClampToRange(upperValue, _min, _max);
-
-            if (clampedUpper - clampedLower < _gap)
-            {
-                float midpoint = (clampedLower + clampedUpper) / 2f;
-                clampedLower = midpoint - _gap / 2f;
-                clampedUpper = midpoint + _gap / 2f;
-
-                clampedLower = ClampToRange(clampedLower, _min, _max - _gap);
-                clampedUpper = ClampToRange(clampedUpper, _min + _gap, _max);
-            }
-
-            _range = new FloatRange(clampedLower, clampedUpper);
-        }
-
-        public void SetToFullRange()
-        {
-            SetValues(_min, _max);
-        }
-
-        public void SetToSingleValue(float value)
-        {
-            float clampedValue = ClampToRange(value, _min, _max);
-            _range = new FloatRange(clampedValue, clampedValue);
+            return ComputedRect;
         }
 
         private float ClampToRange(float value, float min, float max)

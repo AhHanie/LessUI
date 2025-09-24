@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using UnityEngine;
 using Verse;
 
@@ -10,11 +9,9 @@ namespace LessUI
         private Rect _rect;
         private StrongBox<Vector2> _scrollPosition;
         private bool _showScrollbars = true;
-        private float _padding = 0f;
         private bool _drawMenuSection = true;
 
-        private const float SCROLLBAR_WIDTH = 16f;
-        private const float SCROLLBAR_HEIGHT = 16f;
+        private Rect _contentBounds = Rect.zero;
 
         public Vector2 ScrollPosition
         {
@@ -22,16 +19,16 @@ namespace LessUI
             set => _scrollPosition.Value = value;
         }
 
+        public StrongBox<Vector2> ScrollPositionBox
+        {
+            get => _scrollPosition;
+            set => _scrollPosition = value;
+        }
+
         public bool ShowScrollbars
         {
             get => _showScrollbars;
             set => _showScrollbars = value;
-        }
-
-        public float Padding
-        {
-            get => _padding;
-            set => _padding = value;
         }
 
         public bool DrawMenuSection
@@ -45,19 +42,22 @@ namespace LessUI
             get => _rect;
             set
             {
-                _rect = value;
-                X = value.x;
-                Y = value.y;
-                Width = value.width;
-                Height = value.height;
+                if (_rect != value)
+                {
+                    _rect = value;
+                    X = value.x;
+                    Y = value.y;
+                    Width = value.width;
+                    Height = value.height;
+                    InvalidateLayout();
+                }
             }
         }
 
         public ScrollCanvas(
             Rect? rect = null,
             bool? showScrollbars = null,
-            float? padding = null,
-            StrongBox<Vector2> scrollPosition = null,
+            StrongBox<Vector2> scrollPositionBox = null,
             float? x = null,
             float? y = null,
             float? width = null,
@@ -72,8 +72,7 @@ namespace LessUI
             : base(x, y, width, height, widthMode, heightMode, alignment, showBorders, borderColor, borderThickness)
         {
             _showScrollbars = showScrollbars ?? true;
-            _padding = padding ?? 0f;
-            _scrollPosition = scrollPosition ?? new StrongBox<Vector2>(Vector2.zero);
+            _scrollPosition = scrollPositionBox ?? new StrongBox<Vector2>(Vector2.zero);
 
             WidthMode = SizeMode.Fixed;
             HeightMode = SizeMode.Fixed;
@@ -89,142 +88,144 @@ namespace LessUI
             }
         }
 
-        protected override void CalculateElementSize()
+        protected override Size ComputeIntrinsicSize()
         {
-            base.CalculateElementSize();
+            float intrinsicWidth = _rect.width > 0 ? _rect.width : Width;
+            float intrinsicHeight = _rect.height > 0 ? _rect.height : Height;
 
-            if (WidthMode == SizeMode.Content)
-            {
-                WidthCalculated = true;
-                Width = _rect.width;
-            }
-
-            if (HeightMode == SizeMode.Content)
-            {
-                HeightCalculated = true;
-                Height = _rect.height;
-            }
+            return new Size(intrinsicWidth, intrinsicHeight);
         }
 
-        public Rect CalculateScrollRect()
+        protected override Size ComputeResolvedSize(Size availableSize)
         {
-            float paddedX = _rect.x + _padding;
-            float paddedY = _rect.y + _padding;
-            float paddedWidth = Mathf.Max(1f, _rect.width - (_padding * 2f));
-            float paddedHeight = Mathf.Max(1f, _rect.height - (_padding * 2f));
+            float resolvedWidth = ComputeResolvedWidth(availableSize.width);
+            float resolvedHeight = ComputeResolvedHeight(availableSize.height);
 
-            return new Rect(paddedX, paddedY, paddedWidth, paddedHeight);
-        }
-
-        public Rect CalculateViewRect()
-        {
-            if (Children.Count == 0)
-            {
-                return _rect;
-            }
-
-            float minX = float.MaxValue;
-            float minY = float.MaxValue;
-            float maxX = float.MinValue;
-            float maxY = float.MinValue;
-
-            foreach (var child in Children)
-            {
-                minX = Mathf.Min(minX, child.X);
-                minY = Mathf.Min(minY, child.Y);
-                maxX = Mathf.Max(maxX, child.X + child.Width);
-                maxY = Mathf.Max(maxY, child.Y + child.Height);
-            }
-
-            float contentWidth = maxX - minX;
-            float contentHeight = maxY - minY;
-
-            float viewX = minX;
-            float viewY = minY;
-            float viewWidth = contentWidth;
-            float viewHeight = contentHeight;
-
-            bool contentFitsInCanvas = minX >= _rect.x && maxX <= (_rect.x + _rect.width) &&
-                                     minY >= _rect.y && maxY <= (_rect.y + _rect.height);
-
-            if (contentFitsInCanvas && (contentWidth < _rect.width || contentHeight < _rect.height))
-            {
-                viewX = _rect.x;
-                viewY = _rect.y;
-                viewWidth = Mathf.Max(contentWidth, _rect.width);
-                viewHeight = Mathf.Max(contentHeight, _rect.height);
-            }
-
-            return new Rect(viewX, viewY, viewWidth, viewHeight);
-        }
-
-        public override void Render()
-        {
-            CalculateElementSize();
-
-            var viewRect = CalculateViewRect();
-            var scrollRect = CalculateScrollRect();
-            var currentScrollPosition = ScrollPosition;
-
-            if (_drawMenuSection)
-            {
-                Widgets.DrawMenuSection(_rect);
-            }
-            Widgets.BeginScrollView(scrollRect, ref currentScrollPosition, viewRect, _showScrollbars);
-
-            ScrollPosition = currentScrollPosition;
-
-            try
-            {
-                RenderElement();
-                LayoutChildren();
-
-                foreach (var child in Children)
-                {
-                    child.Render();
-                }
-
-                if (ShowBorders)
-                {
-                    DrawBorders(BorderColor, BorderThickness);
-                }
-            }
-            finally
-            {
-                Widgets.EndScrollView();
-            }
+            return new Size(resolvedWidth, resolvedHeight);
         }
 
         protected override void LayoutChildren()
         {
-        }
+            var contentArea = CalculateScrollArea();
+            var availableSize = new Size(contentArea.width, contentArea.height);
 
-        protected override void RenderElement()
-        {
-        }
-
-        public override float CalculateFillWidth(UIElement child)
-        {
-            float availableWidth = Width - (_padding * 2f);
-
-            if (_showScrollbars)
+            foreach (var child in Children)
             {
-                availableWidth -= SCROLLBAR_WIDTH;
+                child.X = 0f;
+                child.Y = 0f;
+                child.ResolveLayout(availableSize);
             }
 
-            return Math.Max(1f, availableWidth);
+            CalculateContentBounds();
         }
 
-        public override float CalculateFillHeight(UIElement child)
+        private void CalculateContentBounds()
         {
-            float availableHeight = Height - (_padding * 2f);
+            var contentArea = CalculateScrollArea();
 
-            if (_showScrollbars)
+            if (Children.Count == 0)
             {
-                availableHeight -= SCROLLBAR_HEIGHT;
+                _contentBounds = new Rect(0, 0, contentArea.width, contentArea.height);
+                return;
             }
 
-            return Math.Max(1f, availableHeight);
+            float maxX = 0f;
+            float maxY = 0f;
+
+            foreach (var child in Children)
+            {
+                maxX = Mathf.Max(maxX, child.ComputedX + child.ComputedWidth);
+                maxY = Mathf.Max(maxY, child.ComputedY + child.ComputedHeight);
+            }
+
+            float contentWidth = maxX;
+            float contentHeight = maxY;
+
+            bool needsVerticalScrollbar = maxY > contentArea.height;
+            bool needsHorizontalScrollbar = maxX > contentArea.width;
+            bool contentFitsHorizontally = maxX <= contentArea.width;
+            bool contentFitsVertically = maxY <= contentArea.height;
+
+            if (needsVerticalScrollbar && contentFitsHorizontally)
+            {
+                contentWidth = Mathf.Max(1f, contentArea.width - 35f);
+            }
+            else if (needsHorizontalScrollbar && contentFitsVertically)
+            {
+                contentHeight = Mathf.Max(1f, contentArea.height - 35f);
+            }
+            else if (!needsVerticalScrollbar && !needsHorizontalScrollbar)
+            {
+                contentWidth = contentArea.width;
+                contentHeight = contentArea.height;
+            }
+
+            _contentBounds = new Rect(0, 0, contentWidth, contentHeight);
+        }
+
+        private Rect CalculateScrollArea()
+        {
+            float inset = 2f;
+            return new Rect(
+                ComputedX + inset,
+                ComputedY + inset,
+                ComputedWidth - (inset * 2f),
+                ComputedHeight - (inset * 2f)
+            );
+        }
+
+        public override void Paint()
+        {
+            var scrollArea = CalculateScrollArea();
+            var currentScrollPosition = ScrollPosition;
+
+            if (_drawMenuSection)
+            {
+                Widgets.DrawMenuSection(ComputedRect);
+            }
+
+            Widgets.BeginScrollView(scrollArea, ref currentScrollPosition, _contentBounds, _showScrollbars);
+
+            try
+            {
+                foreach (var child in Children)
+                {
+                    child.Paint();
+                }
+            }
+            finally
+            {
+                ScrollPosition = currentScrollPosition;
+                Widgets.EndScrollView();
+            }
+
+            if (ShowBorders)
+            {
+                DrawBorders(BorderColor, BorderThickness);
+            }
+        }
+
+        protected override void PaintElement()
+        {
+        }
+
+        public Rect GetContentBounds()
+        {
+            return _contentBounds;
+        }
+
+        public Rect GetContentArea()
+        {
+            return CalculateScrollArea();
+        }
+
+        public bool ContentOverflows
+        {
+            get
+            {
+                var scrollArea = CalculateScrollArea();
+                return _contentBounds.width > scrollArea.width || _contentBounds.height > scrollArea.height;
+            }
         }
 
         public Rect CreateRect()

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -8,11 +7,20 @@ namespace LessUI
     public class Stack : UIElement
     {
         private float _verticalSpacing = 2f;
-        public float VerticalSpacing 
-        { 
+
+        public float VerticalSpacing
+        {
             get => _verticalSpacing;
-            set => _verticalSpacing = value; 
+            set
+            {
+                if (_verticalSpacing != value)
+                {
+                    _verticalSpacing = value;
+                    InvalidateLayout();
+                }
+            }
         }
+
         public Stack(
             float? verticalSpacing = null,
             float? x = null,
@@ -48,32 +56,40 @@ namespace LessUI
             _verticalSpacing = verticalSpacing ?? 2f;
         }
 
-        protected override float CalculateContentWidthFromChildren()
+        protected override float ComputeIntrinsicWidthFromChildren()
         {
-            float width = Children.Max(child => child.Width);
-            return Math.Max(1f, width);
+            if (!Children.Any()) return 0f;
+            return Children.Max(child => child.IntrinsicSize.width);
         }
 
-        protected override float CalculateContentHeightFromChildren()
+        protected override float ComputeIntrinsicHeightFromChildren()
         {
-            float height = Children.Sum(child => child.Height);
+            if (!Children.Any()) return 0f;
+
+            float totalHeight = Children.Sum(child => child.IntrinsicSize.height);
             if (Children.Count > 1)
             {
-                height += _verticalSpacing * (Children.Count - 1);
+                totalHeight += _verticalSpacing * (Children.Count - 1);
             }
-            return Math.Max(1f, height);
+            return totalHeight;
         }
 
         protected override void LayoutChildren()
         {
-            float currentY = Y;
+            if (!Children.Any()) return;
+
+            float currentY = ComputedY;
+            var availableWidth = ComputedWidth;
 
             foreach (var child in Children)
             {
-                child.X = X;
+                child.X = ComputedX;
                 child.Y = currentY;
 
-                currentY += child.Height + _verticalSpacing;
+                var childContainingBlock = new Size(availableWidth, child.IntrinsicSize.height);
+                child.ResolveLayout(childContainingBlock);
+
+                currentY += child.ComputedHeight + _verticalSpacing;
             }
         }
     }
