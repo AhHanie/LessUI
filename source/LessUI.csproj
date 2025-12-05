@@ -66,6 +66,7 @@
     <Compile Include="components\Dropdown.cs" />
     <Compile Include="components\Empty.cs" />
     <Compile Include="components\FloatRangeSlider.cs" />
+    <Compile Include="components\Icon.cs" />
     <Compile Include="components\IntRangeSlider.cs" />
     <Compile Include="components\Line.cs" />
     <Compile Include="components\RadioButton.cs" />

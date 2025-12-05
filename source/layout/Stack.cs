@@ -78,6 +78,30 @@ namespace LessUI
         {
             if (!Children.Any()) return;
 
+            // First pass: calculate space needed for non-Fill children and count Fill children
+            float totalSpacingHeight = (Children.Count - 1) * _verticalSpacing;
+            float fixedHeight = 0f;
+            int fillChildrenCount = 0;
+
+            foreach (var child in Children)
+            {
+                if (child.HeightMode == SizeMode.Fill)
+                {
+                    fillChildrenCount++;
+                }
+                else
+                {
+                    fixedHeight += child.IntrinsicSize.height;
+                }
+            }
+
+            // Calculate remaining height for Fill children
+            float remainingHeight = ComputedHeight - fixedHeight - totalSpacingHeight;
+            float fillChildHeight = fillChildrenCount > 0
+                ? Mathf.Max(0f, remainingHeight / fillChildrenCount)
+                : 0f;
+
+            // Second pass: layout children
             float currentY = ComputedY;
             var availableWidth = ComputedWidth;
 
@@ -86,7 +110,11 @@ namespace LessUI
                 child.X = ComputedX;
                 child.Y = currentY;
 
-                var childContainingBlock = new Size(availableWidth, child.IntrinsicSize.height);
+                float childAvailableHeight = child.HeightMode == SizeMode.Fill
+                    ? fillChildHeight
+                    : child.IntrinsicSize.height;
+
+                var childContainingBlock = new Size(availableWidth, childAvailableHeight);
                 child.ResolveLayout(childContainingBlock);
 
                 currentY += child.ComputedHeight + _verticalSpacing;

@@ -216,33 +216,45 @@ namespace LessUI
 
             if (Children.Count == 0)
             {
-                _contentBounds = contentArea;
+                _contentBounds = new Rect(0, 0, contentArea.width, contentArea.height);
                 return;
             }
 
-            float minX = float.MaxValue;
-            float minY = float.MaxValue;
-            float maxX = float.MinValue;
-            float maxY = float.MinValue;
+            float maxX = 0f;
+            float maxY = 0f;
 
             foreach (var child in Children)
             {
-                minX = Mathf.Min(minX, child.ComputedX);
-                minY = Mathf.Min(minY, child.ComputedY);
                 maxX = Mathf.Max(maxX, child.ComputedX + child.ComputedWidth);
                 maxY = Mathf.Max(maxY, child.ComputedY + child.ComputedHeight);
             }
 
-            float contentWidth = maxX - minX;
-            float contentHeight = maxY - minY;
+            float contentWidth = maxX;
+            float contentHeight = maxY;
 
-            contentWidth = Mathf.Max(contentWidth, contentArea.width);
-            contentHeight = Mathf.Max(contentHeight, contentArea.height);
+            bool needsVerticalScrollbar = maxY > contentArea.height;
+            bool needsHorizontalScrollbar = maxX > contentArea.width;
+            bool contentFitsHorizontally = maxX <= contentArea.width;
+            bool contentFitsVertically = maxY <= contentArea.height;
 
-            _contentBounds = new Rect(minX, minY, contentWidth, contentHeight);
+            if (needsVerticalScrollbar && contentFitsHorizontally)
+            {
+                contentWidth = Mathf.Max(1f, contentArea.width - 35f);
+            }
+            else if (needsHorizontalScrollbar && contentFitsVertically)
+            {
+                contentHeight = Mathf.Max(1f, contentArea.height - 35f);
+            }
+            else if (!needsVerticalScrollbar && !needsHorizontalScrollbar)
+            {
+                contentWidth = contentArea.width;
+                contentHeight = contentArea.height;
+            }
+
+            _contentBounds = new Rect(0, 0, contentWidth, contentHeight);
         }
 
-        protected override void PaintElement()
+        public override void Paint()
         {
             var contentArea = CalculateContentArea();
             var containerRect = ComputedRect;
@@ -262,6 +274,15 @@ namespace LessUI
             {
                 Widgets.EndScrollView();
             }
+
+            if (ShowBorders)
+            {
+                DrawBorders(BorderColor, BorderThickness);
+            }
+        }
+
+        protected override void PaintElement()
+        {
         }
 
         public Rect GetRect()
