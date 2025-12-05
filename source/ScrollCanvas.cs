@@ -179,6 +179,8 @@ namespace LessUI
             var scrollArea = CalculateScrollArea();
             var currentScrollPosition = ScrollPosition;
 
+            bool shadowDrawn = DrawBackground();
+
             if (_drawMenuSection)
             {
                 Widgets.DrawMenuSection(ComputedRect);
@@ -201,7 +203,7 @@ namespace LessUI
 
             if (ShowBorders)
             {
-                DrawBorders(BorderColor, BorderThickness);
+                DrawBorders(BorderColor, BorderThickness, CornerRadius, !shadowDrawn && ShowDropShadow);
             }
         }
 

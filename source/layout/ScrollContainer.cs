@@ -259,6 +259,8 @@ namespace LessUI
             var contentArea = CalculateContentArea();
             var containerRect = ComputedRect;
 
+            bool shadowDrawn = DrawBackground();
+
             Widgets.DrawMenuSection(containerRect);
 
             Widgets.BeginScrollView(contentArea, ref _scrollPositionBox.Value, _contentBounds, _showScrollbars);
@@ -277,7 +279,7 @@ namespace LessUI
 
             if (ShowBorders)
             {
-                DrawBorders(BorderColor, BorderThickness);
+                DrawBorders(BorderColor, BorderThickness, CornerRadius, !shadowDrawn && ShowDropShadow);
             }
         }
 
